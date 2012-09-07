@@ -983,8 +983,12 @@ RDF;
       'ownerId' => (($ownerId !== NULL)? //Default to the current owner if none is provided.
         $ownerId:
         $this->objectProfile->objOwnerId),
-      'state' => $state,
-      'label' => $label,
+      'state' => (empty($state)?
+        $this->objectProfile->objState:
+        $state),
+      'label' => ((empty($label) && $label !== '')?  //Default to current label if none provided
+        $this->objectProfile->objLabel:
+        $label),
       'logMessage' => $logMessage
     );
 
@@ -1198,7 +1202,7 @@ RDF;
 
   function set_datastream_state($dsid, $state, $log_message = 'Modified by Islandora API', $quiet = FALSE) {
     $valid_states = array('A', 'D', 'I');
-    if (array_search($state, $valid_states) !== FALSE) {
+    if (in_array($state, $valid_states)) {
       $params = array(
         'pid' => $this->pid,
         'dsID' => $dsid,
