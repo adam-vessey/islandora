@@ -117,6 +117,17 @@ class FedoraObjectDetailedContent {
         ),
       );
     }
+    
+    if (fedora_repository_access(ObjectHelper::$CHANGE_OBJECT_STATE, $this->pid, $user)) {
+      $tabset['fedora_object_details']['tabset']['view'] += array(
+        'change_state' => array(
+          '#type' => 'fieldset',
+          '#title' => t('Object state'),
+          '#value' => drupal_get_form('fedora_repository_change_state_form', $this->pid),
+          '#weight' => $i++
+        )
+      );
+    }
 
     if (fedora_repository_access(ObjectHelper :: $PURGE_FEDORA_OBJECTSANDSTREAMS, $this->pid, $user)) {
       $tabset['fedora_object_details']['tabset']['view'] += array(

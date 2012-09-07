@@ -12,13 +12,15 @@
 class ObjectHelper {
 
 //allowed operations
-  public static $OBJECT_HELPER_VIEW_FEDORA = 'view fedora collection';
-  public static $EDIT_FEDORA_METADATA = 'edit fedora meta data';
-  public static $PURGE_FEDORA_OBJECTSANDSTREAMS = 'purge objects and datastreams';
-  public static $ADD_FEDORA_STREAMS = 'add fedora datastreams';
-  public static $INGEST_FEDORA_OBJECTS = 'ingest new fedora objects';
-  public static $EDIT_TAGS_DATASTREAM = 'edit tags datastream';
-  public static $VIEW_DETAILED_CONTENT_LIST = 'view detailed list of content';
+  public static $OBJECT_HELPER_VIEW_FEDORA = 'view fedora collection',
+    $EDIT_FEDORA_METADATA = 'edit fedora meta data',
+    $PURGE_FEDORA_OBJECTSANDSTREAMS = 'purge objects and datastreams',
+    $ADD_FEDORA_STREAMS = 'add fedora datastreams',
+    $INGEST_FEDORA_OBJECTS = 'ingest new fedora objects',
+    $EDIT_TAGS_DATASTREAM = 'edit tags datastream',
+    $VIEW_DETAILED_CONTENT_LIST = 'view detailed list of content',
+    $CHANGE_OBJECT_STATE = 'change object state',
+    $CHANGE_DATASTREAM_STATE = 'change datastream state';
 
   // TODO: Make this into a static member constant
   public $availableDataStreamsText = 'Detailed list of content';
@@ -414,7 +416,7 @@ class ObjectHelper {
     
     $downloadVersion = drupal_get_form('fedora_repository_download_datastream_form', $pid, $id, $label_deslashed);
 
-    return array(
+    $row = array(
       array(
         'data' => $label,
       ),
@@ -431,6 +433,15 @@ class ObjectHelper {
         'data' => $replace_image . $purge_image,
       ),
     );
+    
+    if (fedora_repository_access(ObjectHelper::$CHANGE_DATASTREAM_STATE, $pid, $user)) {
+      static $i = 0;
+      $row[] = array(
+        'data' => drupal_get_form('fedora_repository_change_state_form_' . $i++, $pid, $id),
+      );
+    }
+    
+    return $row;
   }
 
   /**
@@ -587,8 +598,22 @@ class ObjectHelper {
 
       $headers = array(
         array(
-          'data' => $availableDataStreamsText,
-          'colspan' => 4,
+          'data' => t('Label'),
+        ),
+        array(
+          'data' => '',
+        ),
+        array(
+          'data' => '',
+        ),
+        array(
+          'data' => t('Mimetype'),
+        ),
+        array(
+          'data' => '',
+        ),
+        array(
+          'data' => t('State'),
         ),
       );
       $DSs = array();
@@ -600,7 +625,7 @@ class ObjectHelper {
           }
         }
       }
-      
+      $headers = array_slice($headers, 0, count($DSs[0]));
       $dataStreamBody = theme('table', $headers, $DSs);
       //if they have access let them add a datastream
       if (user_access(ObjectHelper::$ADD_FEDORA_STREAMS) && //If allowed throw Drupal
