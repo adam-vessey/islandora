@@ -1,8 +1,13 @@
 <?php
 
+/**
+ * @file
+ * This file contains a class to include the Tuque php library.
+ */
+
 $islandora_module_path = drupal_get_path('module', 'fedora_repository');
 
-//do this until we export these in a module or library
+// Do this until we expose these in a module or library.
 @include_once 'sites/all/libraries/tuque/Datastream.php';
 @include_once 'sites/all/libraries/tuque/FedoraApi.php';
 @include_once 'sites/all/libraries/tuque/FedoraApiSerializer.php';
@@ -53,15 +58,24 @@ class IslandoraTuque {
    */
   public $repository = NULL;
 
-  function __construct($user = NULL, $url = NULL) {
-    if(!isset($user)) {
+  /**
+   * Constructor.
+   *
+   * @param array $user
+   *   A Drupal user.
+   * @param string $url
+   *   The url to the fedora instance.
+   */
+  public function __construct($user = NULL, $url = NULL) {
+    if (!isset($user)) {
       global $user;
     }
-    
-    if(!isset($user) || $user->uid == 0){
+
+    if (!isset($user) || $user->uid == 0) {
       $user_string = 'anonymous';
       $pass_string = 'anonymous';
-    } else {
+    }
+    else {
       $user_string = $user->name;
       $pass_string = $user->pass;
     }
@@ -70,46 +84,104 @@ class IslandoraTuque {
       $url = variable_get('fedora_base_url', 'http://localhost:8080/fedora');
     }
 
-    if(self::exists()) {
-      $this->connection = new RepositoryConnection($url, $user_string, $pass_string);
+    if (self::exists()) {
+      module_load_include('inc', 'fedora_repository', 'api/tuque_wrapper');
+      $this->connection = new IslandoraRepositoryConnection($url, $user_string, $pass_string);
       $this->connection->reuseConnection = TRUE;
-      $this->api = new FedoraApi($this->connection);
-      $this->cache = new SimpleCache();
-      $this->repository = new FedoraRepository($this->api, $this->cache);
+      $this->api = new IslandoraFedoraApi($this->connection);
+      $this->cache = new IslandoraSimpleCache();
+      $this->repository = new IslandoraFedoraRepository($this->api, $this->cache);
     }
- }
- 
-  static function exists() {
+  }
+
+  /**
+   * Checks if the Connection class exists.
+   *
+   * @returns bool
+   *   TRUE if the Connection class exists FALSE otherwise.
+   */
+  public static function exists() {
     return class_exists('RepositoryConnection');
   }
 
-  static function getError() {
+  /**
+   * Displays and error for use when Tuque is not installed.
+   */
+  public static function getError() {
     $islandora_doc_link = l(t('Islandora documentation'), 'https://wiki.duraspace.org/display/ISLANDORA/Islandora');
     $tuque_link = l(t('Tuque Fedora API'), 'http://github.com/islandora/tuque');
-    $message = t('Islandora requires the !tuque_url. Please install in /sites/all/libraries/tuque before continuing. See the !islandora_url.', array( '!tuque_url' => $tuque_link, '!islandora_url' => $islandora_doc_link));
-    drupal_set_message($message, 'error', FALSE);
+    $message = t('Islandora requires the !tuque_url. Please install in /sites/all/libraries/tuque before continuing. See the !islandora_url.', array('!tuque_url' => $tuque_link, '!islandora_url' => $islandora_doc_link));
+    drupal_set_message(filter_xss($message), 'error', FALSE);
   }
 }
 
+/**
+* Loads the object from the given ID if possible.
+*
+* Often used to get a connection and return an object for the one specified in
+* the menu path as '%islandora_object'.
+*
+* @param string $object_id
+* The pid of an object in the menu path identified by '%islandora_object'.
+*
+* @return FedoraObject
+* If the given object id exists in the repository then this returns a
+* FedoraObject.
+* If no object was found it returns FALSE which triggers
+* drupal_page_not_found().
+* If the object was inaccessible then NULL is returned, and the
+* access callback is expected to catch that case, triggering
+* drupal_access_denied().
+*/
 function islandora_object_load($object_id) {
-    static $islandora_tuque = NULL;
-
-    if(!$islandora_tuque) {
-      $islandora_tuque = new IslandoraTuque(); 
+  $tuque = islandora_get_tuque_connection();
+  if ($tuque) {
+    try {
+      return $tuque->repository->getObject(urldecode($object_id));
     }
-
-    if(IslandoraTuque::exists()) {
-      try {
-        $fedora_object = $islandora_tuque->repository->getObject($object_id);
-      } catch (Exception $e) {
+    catch (Exception $e) {
+      if ($e->getCode() == '404') {
+        return FALSE;
+      }
+      else {
         return NULL;
       }
-      return $fedora_object;
+    }
+  }
+  else {
+    IslandoraTuque::getError();
+  }
+  // Assuming access denied in all other cases for now.
+  return NULL;
+}
+
+/**
+* Just a wrapper around fetchings the IslandoraTuque object.
+*
+* Includes some very basic error logging.
+*
+* @param object $user
+* The user to connect as.
+* @param string $url
+* The URL to connect to.
+*
+* @return IslandoraTuque
+* A IslandoraTuque instance
+*/
+function islandora_get_tuque_connection($user = NULL, $url = NULL) {
+  static $tuque = NULL;
+  if (!$tuque) {
+    if (IslandoraTuque::exists()) {
+      try {
+        $tuque = new IslandoraTuque($user, $url);
+      }
+      catch (Exception $e) {
+        drupal_set_message(t('Unable to connect to the repository %e', array('%e' => $e)), 'error');
+      }
     }
     else {
-      IslandoraTuque::getError();
       return NULL;
     }
   }
-
-
+  return $tuque;
+}

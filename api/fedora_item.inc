@@ -18,9 +18,11 @@ define("RELS_TYPE_DATETIME", 4);
 
 /**
  * Fedora Item Class
+ *
+ * @deprecated
+ *   Deprecated in favour of using Tuque directly.
  */
 class Fedora_Item {
-
   // The $pid of the fedora object represented by an instance of this class.
   public $pid = NULL;
   public $objectProfile = NULL;
@@ -60,6 +62,7 @@ class Fedora_Item {
     drupal_bootstrap(DRUPAL_BOOTSTRAP_FULL);
     module_load_include('inc', 'fedora_repository', 'ConnectionHelper');
     module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
+    module_load_include('inc', 'fedora_repository', 'api/tuque');
 
     $this->pid = $pid;
     if (isset(Fedora_Item::$instantiated_pids[$pid])) {
@@ -85,8 +88,22 @@ class Fedora_Item {
         $this->datastreams = array();
         $this->ownerId = NULL;
       }
+      
+      // Allow only up to 100 items in the cache...  Maybe should be lower?
+      for ($i = count(Fedora_Item::$instantiated_pids); $i >= 100; $i--) {
+        array_shift(Fedora_Item::$instantiated_pids[$pid]);
+      }
+      
       Fedora_Item::$instantiated_pids[$pid] = &$this;
     }
+  }
+  
+  /**
+   * Get a Tuque FedoraObject representing this Fedora_Item.
+   */
+  protected function get_tuque_object() {
+    $object = islandora_object_load($this->pid);
+    return $object;
   }
 
   /**
@@ -120,34 +137,28 @@ class Fedora_Item {
    * @return type
    */
   function add_datastream_from_file($datastream_file, $datastream_id, $datastream_label = NULL, $datastream_mimetype = '', $controlGroup = 'M', $logMessage = NULL) {
-    module_load_include('inc', 'fedora_repository', 'MimeClass');
-    if (!is_file($datastream_file)) {
-      drupal_set_message(t('The datastream file %datastream_file could not be found! (or is not a regular file...)', array('%datastream_file' => $datastream_file)), 'warning');
-      return;
-    }
-    elseif (!is_readable($datastream_file)) {
-      drupal_set_message(t('The datastream file %datastream_file could not be read! (likely due to permissions...)', array('%datastream_file' => $datastream_file)), 'warning');
-      return;
-    }
-
     if (empty($datastream_mimetype)) {
       // Get mime type from the file extension.
       $mimetype_helper = new MimeClass();
       $datastream_mimetype = $mimetype_helper->getType($datastream_file);
     }
-    $original_path = $datastream_file;
-    // Temporarily move file to a web-accessible location.
-    file_copy($datastream_file, file_directory_path());
-    $datastream_url = drupal_urlencode($datastream_file);
-    $url = file_create_url($datastream_url);
-
-    // Add_datastream_from_url forces a re-sync of the datastream list.
-    $return_value = $this->add_datastream_from_url($url, $datastream_id, $datastream_label, $datastream_mimetype, $controlGroup, $logMessage);
-
-    if ($original_path != $datastream_file) {
-      file_delete($datastream_file);
-    }
-    return $return_value;
+    
+    $object = $this->get_tuque_object();
+    $datastream = $object->constructDatastream($datastream_id, $controlGroup);
+    $datastream->mimetype = $datastream_mimetype;
+    $datastream->label = $datastream_label;
+    $datastream->logMessage = ($logMessage != NULL) ? $logMessage : 'Ingested object ' . $datastream_id;
+    $datastream->setContentFromFile($datastream_file);
+    $result = $object->ingestDatastream($datastream);
+    
+        // Add new DS to the DS list so the item is in sync with the repository.
+    $this->datastreams[$datastream_id] = array(
+      'label' => $datastream_label,
+      'MIMEType' => $datastream_mimetype,
+      'URL' => ($this->url() . '/' . $datastream_id . '/' .
+      drupal_urlencode($datastream_label)),);
+      
+    return $result;
   }
 
   /**
@@ -175,24 +186,15 @@ class Fedora_Item {
       $datastream_url = str_ireplace('https://', 'http://', $datastream_url);
     }
     $datastream_label = truncate_utf8($datastream_label, 255, TRUE, TRUE);
+    
+    $object = $this->get_tuque_object();
+    $datastream = $object->constructDatastream($datastream_id, $controlGroup);
+    $datastream->label = $datastream_label;
+    $datastream->mimetype = $datastream_mimetype;
+    $datastream->setContentFromUrl($datastream_url);
+    $datastream->logMessage = ($logMessage != NULL) ? $logMessage : 'Ingested object ' . $datastream_id;
+    $result = $object->ingestDatastream($datastream);
 
-    $params = array(
-      'pid' => $this->pid,
-      'dsID' => $datastream_id,
-      'altIDs' => NULL,
-      'dsLabel' => $datastream_label,
-      'versionable' => TRUE,
-      'MIMEType' => $datastream_mimetype,
-      'formatURI' => NULL,
-      'dsLocation' => $datastream_url,
-      'controlGroup' => $controlGroup,
-      'dsState' => 'A',
-      'checksumType' => 'DISABLED',
-      'checksum' => 'none',
-      'logMessage' => ($logMessage != NULL) ? $logMessage : 'Ingested object ' . $datastream_id,
-    );
-
-    $soap_result = $this->soap_call('addDataStream', $params);
 
     // Add new DS to the DS list so the item is in sync with the repository.
     $this->datastreams[$datastream_id] = array(
@@ -201,7 +203,7 @@ class Fedora_Item {
       'URL' => ($this->url() . '/' . $datastream_id . '/' .
       drupal_urlencode($datastream_label)),);
 
-    return $soap_result;
+    return $result;
   }
 
   /**
@@ -217,15 +219,22 @@ class Fedora_Item {
    * @return type
    */
   function add_datastream_from_string($str, $datastream_id, $datastream_label = NULL, $datastream_mimetype = 'text/xml', $controlGroup = 'M', $logMessage = NULL) {
-    $dir = file_directory_temp();
-    $tmpfilename = tempnam($dir, 'fedoratmp');
-    $tmpfile = fopen($tmpfilename, 'w');
-    fwrite($tmpfile, $str, strlen($str));
-    fclose($tmpfile);
-    // Add_datastream_from_file forces a re-sync of the datastream list.
-    $returnvalue = $this->add_datastream_from_file($tmpfilename, $datastream_id, $datastream_label, $datastream_mimetype, $controlGroup, $logMessage);
-    unlink($tmpfilename);
-    return $returnvalue;
+    $object = $this->get_tuque_object();
+    $datastream = $object->constructDatastream($datastream_id, $controlGroup);
+    $datastream->mimetype = $datastream_mimetype;
+    $datastream->label = $datastream_label;
+    $datastream->logMessage = ($logMessage != NULL) ? $logMessage : 'Ingested object ' . $datastream_id;
+    $datastream->content = $str;
+    $result = $object->ingestDatastream($datastream);
+    
+        // Add new DS to the DS list so the item is in sync with the repository.
+    $this->datastreams[$datastream_id] = array(
+      'label' => $datastream_label,
+      'MIMEType' => $datastream_mimetype,
+      'URL' => ($this->url() . '/' . $datastream_id . '/' .
+      drupal_urlencode($datastream_label)),);
+      
+    return $result;
   }
 
   /**
@@ -303,54 +312,8 @@ class Fedora_Item {
    *   Value returned from SOAP call for modify_datastream.
    */
   function add_relationship($relationship, $object, $namespaceURI = RELS_EXT_URI, $literal_value = RELS_TYPE_URI) {
-    static $relsextxml = NULL;
-    if ($relsextxml === NULL) {
-      // Avoid new instantiations in long-running processes.
-      $relsextxml = new DOMDocument();
-    }
-
-    $ds_list = $this->datastreams;
-
-    $f_prefix = 'info:fedora/';
-    if (!array_key_exists('RELS-EXT', $ds_list)) {
-      $rdf_string = <<<RDF
-        <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
-          <rdf:Description rdf:about="$f_prefix{$this->pid}">
-          </rdf:Description>
-        </rdf:RDF>
-RDF;
-      $this->add_datastream_from_string($rdf_string, 'RELS-EXT', 'Fedora object-to-object relationship metadata', 'application/rdf+xml', 'X');
-    }
-
-    $relsext = $this->get_datastream_dissemination('RELS-EXT');
-
-    $relsextxml->loadXML($relsext);
-    $description = $relsextxml->getElementsByTagNameNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'Description');
-    if ($description->length == 0) {
-      // XXX: This really shouldn't be done; lower case d doesn't fit the schema.  Warn users to fix the data and generators, pending deprecation.
-      $description = $relsextxml->getElementsByTagNameNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'description');
-      if ($description->length > 0) {
-        drupal_set_message(t('RDF with lower case "d" in "description" encountered.  Should be uppercase! PID: %pid', array('%pid' => $this->pid)), 'warning');
-      }
-    }
-    $description = $description->item(0);
-
-    // Casting a string to an array gives an array containing the string, and
-    //   casting an array to an array does nothing.
-    foreach ((array) $object as $obj) {
-      if ($literal_value == RELS_TYPE_URI && strpos($obj, $f_prefix) !== 0) {
-        $obj = $f_prefix . $obj;
-      }
-
-      // Create the new relationship node.
-      $newrel = $relsextxml->createElementNS($namespaceURI, $relationship);
-
-      $this->buildRelsStatement($newrel, $obj, $literal_value);
-
-      $description->appendChild($newrel);
-    }
-
-    return $this->modify_datastream($relsextxml->saveXML(), 'RELS-EXT', "Fedora Object-to-Object Relationship Metadata", 'application/rdf+xml');
+    $tuque_object = $this->get_tuque_object();;
+    return $tuque_object->relationships->add($namespaceURI, $relationship, $object, $literal_value);
   }
 
   /**
@@ -361,57 +324,8 @@ RDF;
    *   or URI to the datastream (info:fedora/pid/EXAMPLE)
    */
   function add_dsid_relationship($dsid, $relationship, $object, $namespaceURI = RELS_EXT_URI, $literal_value = RELS_TYPE_URI) {
-    static $relsxml = NULL;
-    if ($relsxml === NULL) {
-      // Avoid new instantiations in long-running processes.
-      $relsxml = new DOMDocument();
-    }
-
-    $f_prefix = 'info:fedora/';
-    if (!array_key_exists('RELS-INT', $this->datastreams)) {
-      $rdf_string = <<<RDF
-        <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"/>
-RDF;
-      $this->add_datastream_from_string($rdf_string, 'RELS-INT', 'Fedora datastream relationship metadata', 'application/rdf+xml', 'X');
-    }
-
-    $rels_text = $this->get_datastream_dissemination('RELS-INT');
-
-    if (strpos($dsid, $f_prefix) !== 0) {
-      $dsid = $f_prefix . $this->pid . '/' . $dsid;
-    }
-
-    $relsxml->loadXML($rels_text);
-    $descs = $relsxml->getElementsByTagNameNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'Description');
-    $description = NULL;
-    foreach ($descs as $desc) {
-      if ($desc->getAttributeNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'about') == $dsid) {
-        $description = $desc;
-        break;
-      }
-    }
-
-    // Create the description element if we didn't find it...
-    if ($description === NULL) {
-      $description = $relsxml->createElementNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'rdf:Description');
-      $description->setAttributeNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'rdf:about', $dsid);
-      $relsxml->documentElement->appendChild($description);
-    }
-
-    foreach ((array) $object as $obj) {
-      if ($literal_value == RELS_TYPE_URI && strpos($obj, $f_prefix) !== 0) {
-        $obj = $f_prefix . $object;
-      }
-
-      // Create the new relationship node.
-      $newrel = $relsxml->createElementNS($namespaceURI, $relationship);
-
-      $this->buildRelsStatement($newrel, $obj, $literal_value);
-
-      $description->appendChild($newrel);
-    }
-
-    return $this->modify_datastream($relsxml->saveXML(), 'RELS-INT', "Fedora Datastream Relationship Metadata", 'application/rdf+xml');
+      $tuque_object = $this->get_tuque_object();;
+      return $tuque_object[$dsid]->relationships->add($namespaceURI, $relationship, $object, $literal_value);
   }
 
   /**
@@ -433,38 +347,8 @@ RDF;
    *   Whether or not this operation has produced any changes in the RELS-EXT
    */
   function purge_relationships($relationship, $object, $namespaceURI = RELS_EXT_URI, $literal_value = FALSE) {
-    $relsext = trim($this->get_datastream_dissemination('RELS-EXT'));
-
-    $relsextxml = new DOMDocument();
-    $modified = FALSE;
-
-    if ($relsext && $relsextxml->loadXML($relsext)) {
-      $rels = $relsextxml->getElementsByTagNameNS($namespaceURI, $relationship);
-      if (!empty($rels)) {
-        // Iterate backwards so if we delete something our pointer doesn't get out of sync.
-        for ($i = $rels->length; $i > 0; $i--) {
-          $rel = $rels->item($i - 1);
-          // Foreach ($rels as $rel) { // moving forward like this caused iteration errors when something was deleted.
-          if (
-          // If either no object is specified, or the object matches (in either the literal or URI case), remove this node from it's parent, and mark as changed.
-              empty($object) ||
-              (($literal_value == RELS_TYPE_URI) && $rel->getAttributeNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'resource') == $object) ||
-              (($literal_value == RELS_TYPE_PLAIN_LITERAL) && $rel->textContent == $object) ||
-              (($literal_value == RELS_TYPE_STRING) && $rel->getAttribute('rdf:datatype') == 'http://www.w3.org/2001/XMLSchema#string' && $rel->textContent == $object) ||
-              (($literal_value == RELS_TYPE_INT) && $rel->getAttribute('rdf:datatype') == 'http://www.w3.org/2001/XMLSchema#int' && intval($rel->textContent) == $object)) {
-            $rel->parentNode->removeChild($rel);
-            $modified = TRUE;
-          }
-        }
-      }
-
-      // Save changes.
-      if ($modified) {
-        $this->modify_datastream($relsextxml->saveXML(), 'RELS-EXT', "Fedora Object-to-Object Relationship Metadata", 'text/xml');
-      }
-    }
-    // Return whether or not we've introduced any changes.
-    return $modified;
+    $tuque_object = $this->get_tuque_object();;
+    return $tuque_object->relationships->remove($namespaceURI, $relationship, $object, $literal_value);
   }
 
   /**
@@ -475,54 +359,8 @@ RDF;
    *   or URI to the datastream (info:fedora/pid/EXAMPLE)
    */
   function purge_dsid_relationships($dsid, $relationship, $object, $namespaceURI = RELS_EXT_URI, $literal_value = FALSE) {
-    $f_prefix = 'info:fedora/';
-    if (strpos($dsid, $f_prefix) !== 0) {
-      $dsid = $f_prefix . $this->pid . '/' . $dsid;
-    }
-
-    $relsxml = new DOMDocument();
-    $relsint = trim($this->get_datastream_dissemination('RELS-INT'));
-    $modified = FALSE;
-    if ($relsint && $relsxml->loadXML($relsint)) {
-
-
-      $descs = $relsxml->getElementsByTagNameNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'Description');
-      $description = NULL;
-      foreach ($descs as $desc) {
-        if ($dsid === NULL || $desc->getAttributeNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'about') == $dsid) {
-          $rels = $desc->getElementsByTagNameNS($namespaceURI, $relationship);
-          if (!empty($rels)) {
-            // Iterate backwards so if we delete something our pointer doesn't get out of sync.
-            for ($i = $rels->length; $i > 0; $i--) {
-              $rel = $rels->item($i - 1);
-              //      foreach ($rels as $rel) { // moving forward like this caused iteration errors when something was deleted
-              // If either no object is specified, or the object matches (in either the literal or URI case), remove this node from it's parent, and mark as changed.
-              if (
-                  empty($object) ||
-                  (($literal_value == RELS_TYPE_URI) && $rel->getAttributeNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'resource') == $object) ||
-                  (($literal_value == RELS_TYPE_PLAIN_LITERAL) && $rel->textContent == $object) ||
-                  (($literal_value == RELS_TYPE_STRING) && $rel->getAttribute('rdf:datatype') == 'http://www.w3.org/2001/XMLSchema#string' && $rel->textContent == $object) ||
-                  (($literal_value == RELS_TYPE_INT) && $rel->getAttribute('rdf:datatype') == 'http://www.w3.org/2001/XMLSchema#int' && intval($rel->textContent) == $object)) {
-                $rel->parentNode->removeChild($rel);
-                $modified = TRUE;
-              }
-            }
-          }
-
-          if ($desc->getAttributeNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'about') == $dsid) {
-            break;
-          }
-        }
-      }
-
-      // Save changes.
-      if ($modified) {
-        $this->modify_datastream($relsxml->saveXML(), 'RELS-INT', "Fedora Datastream Relationship Metadata", 'text/xml');
-      }
-    }
-
-    // Return whether or not we've introduced any changes.
-    return $modified;
+    $tuque_object = $this->get_tuque_object();;
+    return $tuque_object[$dsid]->relationships->remove($namespaceURI, $relationship, $object, $literal_value);
   }
 
   /**
@@ -534,7 +372,6 @@ RDF;
    * @param string $object
    */
   function purge_relationship($relationship, $object) {
-    $relsext = $this->get_datastream_dissemination('RELS-EXT');
     $namespaceURI = 'info:fedora/fedora-system:def/relations-external#';
     // Pre-pend a namespace prefix to recognized relationships
 
@@ -563,27 +400,8 @@ RDF;
         $namespaceURI = ISLANDORA_PAGE_URI;
         break;
     }
-
-    if (!empty($object) && substr($object, 0, 12) != 'info:fedora/') {
-      $object = "info:fedora/$object";
-    }
-
-    $relsextxml = new DomDocument();
-    $relsextxml->loadXML($relsext);
-    $modified = FALSE;
-    $rels = $relsextxml->getElementsByTagNameNS($namespaceURI, $relationship);
-    if (!empty($rels)) {
-      foreach ($rels as $rel) {
-        if (empty($object) || $rel->getAttributeNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'resource') == $object) {
-          $rel->parentNode->removeChild($rel);
-          $modified = TRUE;
-        }
-      }
-    }
-    if ($modified) {
-      $this->modify_datastream($relsextxml->saveXML(), 'RELS-EXT', "Fedora Object-to-Object Relationship Metadata", 'text/xml');
-    }
-    return $modified;
+    
+    return $this->purge_relationships($namespaceURI, $relationship, $object);
   }
 
   /**
@@ -592,13 +410,11 @@ RDF;
    * @return type
    */
   function export_as_foxml() {
-    $params = array(
-      'pid' => $this->pid,
+    $tuque = islandora_get_tuque_connection();
+    return $tuque->repository->api->m->export($this->pid, array(
       'format' => 'info:fedora/fedora-system:FOXML-1.1',
       'context' => 'migrate',
-    );
-    $result = self::soap_call('export', $params);
-    return $result->objectXML;
+    ));
   }
 
   /**
@@ -612,6 +428,7 @@ RDF;
    */
   static function find_objects_by_pattern($pattern = '*', $field = 'pid', $max_results = 100, $resultFields = array()) {
     module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
+    $fedora_url = variable_get('fedora_base_url', 'http://localhost:8080/fedora');
 
     $pattern = drupal_urlencode($pattern);
     $done = FALSE;
@@ -621,19 +438,33 @@ RDF;
     $results = array();
     while (!$done && $i < 5) {
       $i++;
-      $url = variable_get('fedora_base_url', 'http://localhost:8080/fedora');
+      
+      $parameters = array(
+        'pid' => 'true',
+        'title' => 'true',
+        'resultFormat' => 'xml',
+        'maxResults' => $max_results,
+      );
+      if (count($resultFields) > 0) {
+        foreach ($resultFields as $field) {
+          $parameters[$field] = 'true';
+        }
+      }
+      
       if ($cursor == 0) {
-        $url .= "/objects?query=$field~$pattern&pid=true&title=TRUE&resultFormat=xml&maxResults=$max_results";
+        $parameters += array(
+          'query' => "$field~$pattern",
+        );
       }
       else {
-        $url .= "/objects?pid=true&title=true&sessionToken=$session_token&resultFormat=xml&maxResults=$max_results";
+        $parameters += array(
+          'sessionToken' => $session_token,
+        );
       }
 
-      if (count($resultFields) > 0) {
-        $url .= '&' . join('=true&', $resultFields) . '=true';
-      }
-
-      $resultxml = do_curl($url);
+      $resultxml = do_curl(url("$fedora_url/objects", array(
+        'query' => $parameters,
+      )));
       libxml_use_internal_errors(TRUE);
       $resultelements = simplexml_load_string($resultxml);
       if ($resultelements === FALSE) {
@@ -682,31 +513,20 @@ RDF;
    *   NULL if the DS is not present in Fedora Item's datastream list.
    *   The content of the DS (NULL if empty)
    */
-  function get_datastream_dissemination($dsid, $as_of_date_time = "", $quiet = FALSE) {
+  function get_datastream_dissemination($dsid, $as_of_date_time = NULL, $quiet = FALSE) {
     if (!array_key_exists($dsid, $this->datastreams)) {
       return NULL;
     }
 
-    $params = array(
-      'pid' => $this->pid,
-      'dsID' => $dsid,
-      'asOfDateTime' => $as_of_date_time,
-    );
-
-    // Make soap call.
-    $object = self::soap_call('getDataStreamDissemination', $params, $quiet);
-    if (!empty($object)) {
-      $content = $object->dissemination->stream;
-      $content = trim($content);
-    }
-    else {
-      $content = NULL;
-    }
-    return $content;
+    $tuque = islandora_get_tuque_connection();
+    return trim($tuque->repository->api->a->getDatastreamDissemination($this->pid, $dsid, $as_of_date_time));
   }
 
   /**
    * Get datastream
+   *
+   * @deprecated
+   *   Most properties should be available on the Tuque datastream.
    *
    * @param type $dsid
    * @param type $as_of_date_time
@@ -729,6 +549,10 @@ RDF;
 
   /**
    * Get datastream history
+   *
+   * @deprecated
+   *   Either iterating over a datastream object or some other Tuque call is
+   *   preferable.
    *
    * @param type $dsid
    *
@@ -759,39 +583,51 @@ RDF;
    * @return string
    */
   function get_dissemination($service_definition_pid, $method_name, $parameters = array(), $as_of_date_time = NULL) {
-    $params = array(
-      'pid' => $this->pid,
-      'serviceDefinitionPid' => $service_definition_pid,
-      'methodName' => $method_name,
-      'parameters' => $parameters,
-      'asOfDateTime' => $as_of_date_time,
-    );
-    $object = self::soap_call('getDissemination', $params);
-    if (!empty($object)) {
-      $content = $object->dissemination->stream;
-      $content = trim($content);
+  
+    if ($as_of_date_time !== NULL) {
+      watchdog('fedora_repository', 'Using SOAP API for getDissemination, due to use of "asOfDateTime".', array(), WATCHDOG_WARNING);
+      $params = array(
+        'pid' => $this->pid,
+        'serviceDefinitionPid' => $service_definition_pid,
+        'methodName' => $method_name,
+        'parameters' => $parameters,
+        'asOfDateTime' => $as_of_date_time,
+      );
+      
+      $object = self::soap_call('getDissemination', $params);
+      if (!empty($object)) {
+        $content = $object->dissemination->stream;
+        $content = trim($content);
+      }
+      else {
+        $content = "";
+      }
+      return $content;
     }
     else {
-      $content = "";
+      $tuque = islandora_get_tuque_connection();
+      return trim($tuque->repository->api->a->getDissemination($this->pid, $service_definition_pid, $method_name));
     }
-    return $content;
   }
 
   /**
    * Retrieves and returns a SimpleXML list of this item's datastreams,
    * and stores them as an instance variable for caching purposes.
    *
+   * @deprecated
+   *   Still uses the SOAP API, and there are method available which already do
+   *   parsing.
+   *
    * @return SimpleXMLElement
    */
   function get_datastreams_list_as_SimpleXML() {
-    //if ( empty( $this->datastreams_list ) ) {
     $params = array(
       'pid' => $this->pid,
       'asOfDateTime' => "",
     );
 
     $this->datastreams_list = $this->soap_call('listDataStreams', $params);
-    //}
+
     return $this->datastreams_list;
   }
 
@@ -810,7 +646,9 @@ RDF;
    * String location - If the datastream is an external reference or redirect, the url to the contents. TODO: Managed?
    * String checksumType - The algorithm used to compute the checksum. One of "DEFAULT", "DISABLED", "MD5", "SHA-1", "SHA-256", "SHA-385", "SHA-512".
    * String checksum - The value of the checksum represented as a hexadecimal string.
-
+   *
+   * @deprecated
+   *   Using calls on Tuque directly should be preferred.
    *
    * @param string $dsid
    *
@@ -843,27 +681,18 @@ RDF;
    * @return array
    */
   function get_datastreams_list_as_array() {
-    $this->get_datastreams_list_as_SimpleXML();
     $ds_list = array();
-    if ($this->datastreams_list != FALSE) {
-
-      // This is a really annoying edge case: if there is only one
-      // datastream, instead of returning it as an array, only
-      // the single item will be returned directly. We have to
-      // check for this.
-      $xml_list = $this->datastreams_list->datastreamDef;
-      if (!is_array($this->datastreams_list->datastreamDef)) {
-        $xml_list = array($xml_list);
-      }
-
-      foreach ($xml_list as $ds) {
-        if (!is_object($ds)) {
-          print_r($ds);
-        }
-        $ds_list[$ds->ID]['label'] = $ds->label;
-        $ds_list[$ds->ID]['MIMEType'] = $ds->MIMEType;
-        $ds_list[$ds->ID]['URL'] = $this->url() . '/' . $ds->ID . '/' . drupal_urlencode($ds->label);
-      }
+    $object = $this->get_tuque_object();
+    foreach ($object as $dsid => $datastream) {
+      $ds_list[$dsid] = array(
+        'label' => $datastream->label,
+        'MIMEType' => $datastream->mimetype,
+        'URL' => t('!object_url/!datastream_id/!label', array(
+          '!object_url' => $this->url(),
+          '!datastream_id' => $dsid,
+          '!label' => drupal_urlencode($datastream->label),
+        )),
+      );
     }
 
     return $ds_list;
@@ -899,28 +728,18 @@ RDF;
    */
   function get_relationships($relationship = NULL) {
     $relationships = array();
-    try {
-      $relsext = $this->get_datastream_dissemination('RELS-EXT');
-    } catch (exception $e) {
-      drupal_set_message(t("Error retrieving RELS-EXT of object $pid"), 'error');
-      return $relationships;
-    }
-
-    // Parse the RELS-EXT into an associative array.
-    $relsextxml = new DOMDocument();
-    $relsextxml->loadXML($relsext);
-    $relsextxml->normalizeDocument();
-    $rels = $relsextxml->getElementsByTagNameNS('info:fedora/fedora-system:def/relations-external#', '*');
-    foreach ($rels as $child) {
-      if (empty($relationship) || preg_match("/$relationship/", $child->tagName)) {
+    
+    $object = $this->get_tuque_object();
+    foreach ($object->relationships->get(RELS_EXT_URI) as $rel) {
+      if (empty($relationship) || preg_match("/$relationship/", $rel['predicate']['value'])) {
         $relationships[] = array(
           'subject' => $this->pid,
-          'predicate' => $child->tagName,
-          'object' => substr($child->getAttributeNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'resource'), 12),
+          'predicate' => $rel['predicate']['value'],
+          'object' => $rel['object']['value'],
         );
       }
     }
-
+    
     return $relationships;
   }
 
@@ -945,29 +764,11 @@ RDF;
       $namespaces = array($namespaces);
     }
     $relationships = array();
-    try {
-      $relsext = $this->get_datastream_dissemination('RELS-EXT');
-    } catch (exception $e) {
-      drupal_set_message(t('Error retrieving RELS-EXT of object %pid.', array('%pid' => $pid)), 'error');
-      return $relationships;
-    }
-
-    // Parse the RELS-EXT into an associative array.
-    $relsextxml = new DOMDocument();
-    $relsextxml->loadXML($relsext);
-    $relsextxml->normalizeDocument();
-    $allTags = array();
+    
+    $object = $this->get_tuque_object();
     foreach ($namespaces as $namespace) {
-      $allTags[] = $relsextxml->getElementsByTagNameNS($namespace, '*');
-    }
-
-    foreach ($allTags as $tags) {
-      foreach ($tags as $child) {
-        $value = preg_replace('/info:fedora\//', '', $child->getAttributeNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'resource'));
-        if (!$value) {
-          $value = $child->textContent;
-        }
-        $relationships[$child->tagName][] = $value;
+      foreach ($object->relationships->get($namespace) as $rel) {
+        $relationships[$rel['predicate']['value']][] = $rel['object']['value'];
       }
     }
 
@@ -980,50 +781,17 @@ RDF;
   }
 
   /**
-   * Creates a RELS-EXT XML stream from the supplied array and saves it to
-   * the item on the server.
-   *
-   * @param <type> $relationships
-   */
-  function save_relationships($relationships) {
-    // Verify the array format and that it isn't empty.
-    if (!empty($relationships)) {
-      $relsextxml = '<rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:fedora="info:fedora/fedora-system:def/relations-external#" xmlns:fedora-model="info:fedora/fedora-system:def/model#" xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#">'
-          . '<rdf:description rdf:about="' . $this->pid . '">';
-
-      foreach ($relationships as $rel) {
-        if (empty($rel['subject']) || empty($rel['predicate']) || empty($rel['object']) || $rel['subject'] != 'info:fedora/' . $this->pid) {
-          // drupal_set_message should use parameterized variables, not interpolated.
-          drupal_set_message(t("Error with relationship format: " . $rel['subject'] . " - " . $rel['predicate'] . ' - ' . $rel['object']), "error");
-          return FALSE;
-        }
-      }
-    }
-
-    // Do the messy work constructing the RELS-EXT XML. Because addRelationship is broken.
-    return FALSE;
-  }
-
-  /**
    * Set the object to a deleted state
    */
   function move_to_trash($log_message = 'Flagged deleted using Islandora API.', $quiet = TRUE) {
-    // Loop through the datastreams and mark them deleted.
-    foreach ($this->get_datastreams_list_as_array() as $dsid => $info) {
-      $this->set_datastream_state($dsid, 'D');
+    $object = $this->get_tuque_object();
+    foreach ($object as $datastream) {
+      $datastream->state = 'D';
     }
+    $object->logMessage = $log_message;
+    $object->state = 'D';
 
-    // Create a message to mark the object deleted.
-    $params = array(
-      'pid' => $this->pid,
-      'state' => 'D',
-      'logMessage' => $log_message,
-      'label' => $this->objectProfile->objLabel,
-      'ownerId' => null,
-    );
-
-    // Send message to mark the object deleted.
-    return self::soap_call('modifyObject', $params, $quiet);
+    return TRUE;
   }
 
   /**
@@ -1033,21 +801,15 @@ RDF;
    * @return type
    */
   function purge($log_message = 'Purged using Islandora API.', $force = FALSE) {
-
     // Flag the object to be deleted first.
     $this->move_to_trash($log_message);
-
-    // Create the delete message.
-    $params = array(
-      'pid' => $this->pid,
-      'logMessage' => $log_message,
-      'force' => $force,
-    );
+    $tuque = islandora_get_tuque_connection();
+    
+    $result = $tuque->repository->purgeObject($this->pid);
 
     $this->forget();
 
-    // Delete the object.
-    return $this->soap_call('purgeObject', $params);
+    return $result;
   }
 
   /**
@@ -1062,18 +824,26 @@ RDF;
    * @return type
    */
   function purge_datastream($dsID, $start_date = NULL, $end_date = NULL, $log_message = 'Purged datastream using Islandora API', $force = FALSE) {
-    $params = array(
-      'pid' => $this->pid,
-      'dsID' => $dsID,
-      'startDT' => $start_date,
-      'endDT' => $end_date,
-      'logMessage' => $log_message,
-      'force' => $force,
-    );
-    $soap_result = $this->soap_call('purgeDatastream', $params);
+    if (empty($start_date) && empty($end_date)) {
+      $start = empty($start_date)?FALSE:strtotime($start_date);
+      $end = empty($end_date)?FALSE:strtotime($end);
+
+      $tuque = islandora_get_tuque_connection();
+      $result = $tuque->repository->api->m->purgeDatastream($this->pid, $dsID, array(
+        'startDT' => $start_date,
+        'endDT' => $end_date,
+        'logMessage' => $log_message,
+      ));
+    }
+    else {
+      $object = $this->get_tuque_object();
+      unset($object[$dsID]);
+      $result = TRUE;
+    }
+
     // Make sure to refresh the datastream list after adding so this item stays in sync with the repository.
     $this->datastreams = $this->get_datastreams_list_as_array();
-    return $soap_result;
+    return $result;
   }
 
   /**
@@ -1083,7 +853,12 @@ RDF;
    * @return type
    */
   function url() {
-    return url('fedora/repository/' . $this->pid . (!empty($this->objectProfile) ? '/-/' . drupal_urlencode($this->objectProfile->objLabel) : ''), array(
+    return url(t('fedora/repository/!pid!label_part', array(
+        '!pid' => $this->pid,
+        '!label_part' => (!empty($this->objectProfile)?
+            '/-/' . drupal_urlencode($this->objectProfile->objLabel):
+            ''),
+      )), array(
       'absolute' => TRUE,
     ));
   }
@@ -1096,26 +871,8 @@ RDF;
    * @return string
    */
   static function get_next_PID_in_namespace($pid_namespace = '', $number_of_pids = 1) {
-    if (empty($pid_namespace)) {
-      // Just get the first one in the config settings.
-      $allowed_namespaces = explode(" ", variable_get('fedora_pids_allowed', 'default: demo: changeme: islandora: ilives: islandora-book: books: newspapers: '));
-      $pid_namespace = $allowed_namespaces[0];
-      if (!empty($pid_namespace)) {
-        $pid_namespace = substr($pid_namespace, 0, strpos($pid_namespace, ":"));
-      }
-      else {
-        $pid_namespace = 'default';
-      }
-    }
-
-    $params = array(
-      'numPIDs' => $number_of_pids,
-      'pidNamespace' => $pid_namespace,
-    );
-
-    $result = self::soap_call('getNextPID', $params);
-
-    return $result->pid;
+    $tuque = islandora_get_tuque_connection();
+    return $tuque->repository->api->m->getNextPid($pid_namespace, $number_of_pids);
   }
 
   /**
@@ -1126,13 +883,12 @@ RDF;
    * @return Fedora_Item
    */
   static function ingest_from_FOXML(DOMDocument $foxml) {
-    $params = array(
-      'objectXML' => $foxml->saveXML(),
+    $tuque = islandora_get_tuque_connection();
+    return new Fedora_Item($tuque->repository->api->m->ingest(array(
+      'string' => $foxml->saveXML(),
       'format' => 'info:fedora/fedora-system:FOXML-1.1',
       'logMessage' => 'Fedora Object Ingested',
-    );
-    $object = self::soap_call('ingest', $params);
-    return new Fedora_Item($object->objectPID);
+    )));
   }
 
   /**
@@ -1143,9 +899,12 @@ RDF;
    * @return type
    */
   static function ingest_from_FOXML_file($foxml_file) {
-    $foxml = new DOMDocument();
-    $foxml->load($foxml_file);
-    return self::ingest_from_FOXML($foxml);
+    $tuque = islandora_get_tuque_connection();
+    return new Fedora_Item($tuque->repository->api->m->ingest(array(
+      'file' => $foxml_file,
+      'format' => 'info:fedora/fedora-system:FOXML-1.1',
+      'logMessage' => 'Fedora Object Ingested',
+    )));
   }
 
   /**
@@ -1186,16 +945,20 @@ RDF;
   function modify_object($label = '', $state = NULL, $ownerId = NULL, $logMessage = 'Modified by Islandora API', $quiet=TRUE) {
     $params = array(
       'pid' => $this->pid,
-      // Default to the current owner if none is provided..
-      'ownerId' => (($ownerId !== NULL) ?
-          $ownerId :
-          $this->ownerId),
+      'owner' => $this->ownerId,
       'state' => $state,
       'label' => $label,
-      'logMessage' => $logMessage,
+      //'logMessage' => $logMessage,
     );
-
-    return self::soap_call('modifyObject', $params, $quiet);
+    $params = array_filter($params);
+    if ($params) {
+      $object = $this->get_tuque_object();
+      
+      foreach ($params as $param => $value) {
+        $object->logMessage;
+        $object->$param = $value;
+      }
+    }
   }
 
   /**
@@ -1283,60 +1046,35 @@ RDF;
    */
   function modify_datastream($filename_or_content, $dsid, $label, $mime_type, $force = FALSE, $logMessage='Modified by Islandora API', $quiet=FALSE) {
     $toReturn = NULL;
+    $object = $this->get_tuque_object();
+    $datastream = $object[$dsid];
+
+    $datastream->logMessage = $logMessage;
+    $datastream->label = $label;
+    $datastream->mimetype = $mime_type;
 
     // Determine if it's inline xml; if it is, modify by value.
-    if ($this->get_datastream($dsid)->controlGroup === 'X') {
+    if (in_array($datastream->controlGroup, array('X', 'M'))) {
+
       $content = '<null/>';
       if (is_file($filename_or_content) && is_readable($filename_or_content)) {
-        $content = file_get_contents($filename_or_content);
+        $datastream->setContentFromFile($filename_or_content);
       }
       else {
         // XXX:  Get the contents to deal with fopen not being allowed for remote access
         //in some OSs
         $temp_content = self::try_http_get_content($filename_or_content);
         if ($temp_content !== FALSE) {
-          $content = $temp_content;
+          $toReturn = $datastream->setContentFromString($temp_content);
         }
         else {
-          $content = $filename_or_content;
+          $toReturn = $datastream->setContentFromString($filename_or_content);
         }
       }
-
-      $toReturn = $this->modify_datastream_by_value($content, $dsid, $label, $mime_type, $force, $logMessage);
     }
-    // Otherwise, write to web-accessible temp file and modify by reference.
     else {
-      $file = '';
-      $created_temp = FALSE;
-      if (is_file($filename_or_content) && is_readable($filename_or_content)) {
-        $file = $filename_or_content;
-        $original_path = $file;
-        // Temporarily move file to a web-accessible location.
-        file_copy($file, file_directory_path());
-        $created_temp = ($original_path != $file);
-      }
-      else {
-        // XXX:  Get the contents to deal with fopen not being allowed for remote access
-        //   in some OSs
-        $temp_content = self::try_http_get_content($filename_or_content);
-        if ($temp_content !== FALSE) {
-          $filename_or_content = $temp_content;
-        }
-
-        // Push contents to a web-accessible file.
-        $file = file_save_data($filename_or_content, file_create_filename($label, file_directory_path()));
-        $created_temp = TRUE;
-      }
-
-      $parts = explode(DIRECTORY_SEPARATOR, $file);
-      $parts = array_map('rawurlencode', $parts);
-      $file_url = file_create_url(implode(DIRECTORY_SEPARATOR, $parts));
-
-      $toReturn = $this->modify_datastream_by_reference($file_url, $dsid, $label, $mime_type, $force, $logMessage);
-
-      if ($created_temp && is_file($file) && is_writable($file)) {
-        file_delete($file);
-      }
+      $datastream->url = $filename_or_content;
+      $toReturn = TRUE;
     }
 
     return $toReturn;
@@ -1364,20 +1102,15 @@ RDF;
       $external_url = str_ireplace('https://', 'http://', $external_url);
     }
 
-    $params = array(
-      'pid' => $this->pid,
-      'dsID' => $dsid,
-      'altIDs' => NULL,
-      'dsLabel' => $label,
-      'MIMEType' => $mime_type,
-      'formatURI' => NULL,
-      'dsLocation' => $external_url,
-      'checksumType' => 'DISABLED',
-      'checksum' => 'none',
-      'logMessage' => $logMessage,
-      'force' => $force,
-    );
-    return self::soap_call('modifyDatastreamByReference', $params, $quiet);
+    $object = $this->get_tuque_object();
+    $datastream = $object[$dsid];
+    
+    $datastream->logMessage = $logMessage;
+    $datastream->label = $label;
+    $datastream->mimetype = $mime_type;
+    $datastream->url = $external_url;
+    
+    return TRUE;
   }
 
   /**
@@ -1394,20 +1127,15 @@ RDF;
    * @return type
    */
   function modify_datastream_by_value($content, $dsid, $label, $mime_type, $force = FALSE, $logMessage = 'Modified by Islandora API', $quiet=FALSE) {
-    $params = array(
-      'pid' => $this->pid,
-      'dsID' => $dsid,
-      'altIDs' => NULL,
-      'dsLabel' => $label,
-      'MIMEType' => $mime_type,
-      'formatURI' => NULL,
-      'dsContent' => $content,
-      'checksumType' => 'DISABLED',
-      'checksum' => 'none',
-      'logMessage' => $logMessage,
-      'force' => $force,
-    );
-    return self::soap_call('modifyDatastreamByValue', $params, $quiet);
+    $object = $this->get_tuque_object();
+    $datastream = $object[$dsid];
+    
+    $datastream->logMessage = $logMessage;
+    $datastream->label = $label;
+    $datastream->mimetype = $mime_type;
+    $datastream->content = $content;
+    
+    return TRUE;
   }
 
   /**
@@ -1418,20 +1146,18 @@ RDF;
    * @param unknown_type $quiet
    */
   function set_datastream_state($dsid, $state, $log_message = 'Modified by Islandora API', $quiet = FALSE) {
-    $valid_states = array('A', 'D', 'I');
-    if (array_search($state, $valid_states) !== FALSE) {
-      $params = array(
-        'pid' => $this->pid,
-        'dsID' => $dsid,
-        'dsState' => $state,
-        'logMessage' => $log_message,
-      );
-      return self::soap_call('setDatastreamState', $params, $quiet);
-    }
+    $object = $this->get_tuque_object();
+    $datastream = $object[$dsid];
+    
+    $datastream->logMessage = $logMessage;
+    $datastream->state = $state;
   }
 
   /**
    * Make a soap call to the fedora API.
+   *
+   * @deprecated
+   *   Calls should be made via Tuque.
    *
    * @param string $function
    *   The name of the soap function to call.
@@ -1477,6 +1203,27 @@ RDF;
     }
     return $result;
   }
+  
+  protected static function create_new_tuque_object($pid = '', $state = 'A', $label = 'Untitled', $owner = '') {
+    $tuque = islandora_get_tuque_connection();
+    $new_object = $tuque->repository->constructObject($pid);
+    $new_object->label = truncate_utf8($label, 255, TRUE, TRUE);
+    $new_object->state = $state;
+    
+    if (empty($owner)) {
+      global $user;
+      // Default to current Drupal user.
+      if (!empty($user->name)) {
+        $new_object->owner = $user->name;
+      }
+      // We are annonamous user.
+      elseif ($user->uid == 0) {
+        $new_object->owner = 'anonymous';
+      }
+    }
+    
+    return $new_object;
+  }
 
   /**
    * Creates the minimal FOXML for a new Fedora object, which is then passed to
@@ -1492,49 +1239,10 @@ RDF;
    * @return DOMDocument
    */
   static function create_object_FOXML($pid = '', $state = 'A', $label = 'Untitled', $owner = '') {
-    $foxml = new DOMDocument("1.0", "UTF-8");
-    $foxml->formatOutput = TRUE;
-    if (empty($pid)) {
-      // Call getNextPid.
-      $pid = self::get_next_PID_in_namespace();
-    }
-    if (empty($owner)) {
-      global $user;
-      // Default to current Drupal user.
-      if (!empty($user->name)) {
-        $owner = $user->name;
-      }
-      // We are annonamous user.
-      elseif ($user->uid == 0) {
-        $owner = 'anonymous';
-      }
-    }
+    $new_object = self::create_new_tuque_object($pid, $state, $label, $owner);
 
-    $root_element = $foxml->createElementNS("info:fedora/fedora-system:def/foxml#", "foxml:digitalObject");
-    $root_element->setAttribute("VERSION", "1.1");
-    $root_element->setAttribute("PID", $pid);
-    $root_element->setAttributeNS("http://www.w3.org/2001/XMLSchema-instance", "xsi:schemaLocation", "info:fedora/fedora-system:def/foxml# http://www.fedora.info/definitions/1/0/foxml1-1.xsd");
-    $foxml->appendChild($root_element);
-
-    // FOXML object properties section.
-    $object_properties = $foxml->createElementNS("info:fedora/fedora-system:def/foxml#", "foxml:objectProperties");
-    $state_property = $foxml->createElementNS("info:fedora/fedora-system:def/foxml#", "foxml:property");
-    $state_property->setAttribute("NAME", "info:fedora/fedora-system:def/model#state");
-    $state_property->setAttribute("VALUE", $state);
-
-    $label_property = $foxml->createElementNS("info:fedora/fedora-system:def/foxml#", "foxml:property");
-    $label_property->setAttribute("NAME", "info:fedora/fedora-system:def/model#label");
-    $label_property->setAttribute("VALUE", truncate_utf8($label, 255, TRUE, TRUE));
-
-    $owner_property = $foxml->createElementNS("info:fedora/fedora-system:def/foxml#", "foxml:property");
-    $owner_property->setAttribute("NAME", "info:fedora/fedora-system:def/model#ownerId");
-    $owner_property->setAttribute("VALUE", $owner);
-
-    $object_properties->appendChild($state_property);
-    $object_properties->appendChild($label_property);
-    $object_properties->appendChild($owner_property);
-    $root_element->appendChild($object_properties);
-    $foxml->appendChild($root_element);
+    $foxml = new FoxmlDocument($new_object);    
+    
     return $foxml;
   }
 
@@ -1549,7 +1257,10 @@ RDF;
    * @return type
    */
   static function ingest_new_item($pid = '', $state = 'A', $label = '', $owner = '') {
-    return self::ingest_from_FOXML(self::create_object_FOXML($pid, $state, $label, $owner));
+    $new_object = self::create_new_tuque_object($pid, $state, $label, $owner);
+    $pid = $new_object->repository->ingestObject($new_object);
+    
+    return new Fedora_Item($pid);
   }
 
   /**
@@ -1572,28 +1283,7 @@ RDF;
    *   The Fedora PID to retrieve the
    */
   static function getOwnerId($PID) {
-    $params = array(
-      'query' => array(
-        'conditions' => array(
-          array(
-            'property' => 'pid',
-            'operator' => 'eq',
-            'value' => $PID,
-          ),
-        ),
-        'terms' => '',
-      ),
-      'resultFields' => array('pid', 'ownerId'),
-      'maxResults' => 1,
-    );
-    $response = Fedora_Item::soap_call('findObjects', $params);
-
-    if (!$response) {
-      return FALSE;
-    }
-    $ownerId = $response->result->resultList->objectFields->ownerId;
-
-    return $ownerId;
+    $object = islandora_object_load($PID);
+    return $object->owner;
   }
-
 }
