@@ -351,17 +351,33 @@ class IslandoraFedoraApiM extends FedoraApiM {
 }
 
 class IslandoraSimpleCache implements AbstractCache {
-  protected static $cache_prefix = 'islandora_tuque_cache';
-  protected static $cache_table = 'cache';
+  protected static $cachePrefix = 'islandora_tuque_cache';
+  protected static $cacheTable = 'cache';
 
+  /**
+   * @see AbstractCache::resetCache()
+   */
   public static function resetCache() {
-    cache_clear_all(static::$cache_prefix, static::$cache_table, TRUE);
+    cache_clear_all(static::$cachePrefix, static::$cacheTable, TRUE);
   }
 
+  /**
+   * Build up key for use in cache.
+   *
+   * @param string $key
+   *   The base key to use in the cache.
+   *
+   * @return string
+   *   The key adjusted such that our values in the cache should be considered
+   *   separately from other values, by prepending a prefix.
+   */
   protected static function getKey($key) {
-    return static::$cache_prefix . "_{$key}";
+    return static::$cachePrefix . "_{$key}";
   }
 
+  /**
+   * @see AbstractCache::add()
+   */
   public function add($key, $data) {
     if ($this->get($key) !== FALSE) {
       return FALSE;
@@ -370,13 +386,19 @@ class IslandoraSimpleCache implements AbstractCache {
     return $this->set($key, $data);
   }
 
+  /**
+   * @see AbstractCache::set()
+   */
   public function set($key, $data) {
-    cache_set(static::getKey($key), $data, static::$cache_table, CACHE_TEMPORARY);
+    cache_set(static::getKey($key), $data, static::$cacheTable, CACHE_TEMPORARY);
     return TRUE;
   }
 
+  /**
+   * @see AbstractCache::get()
+   */
   public function get($key) {
-    $cache_value = cache_get(static::getKey($key), static::$cache_table);
+    $cache_value = cache_get(static::getKey($key), static::$cacheTable);
     if ($cache_value !== FALSE) {
       return $cache_value->data;
     }
@@ -385,9 +407,12 @@ class IslandoraSimpleCache implements AbstractCache {
     }
   }
 
+  /**
+   * @see AbstractCache::delete()
+   */
   public function delete($key) {
     if ($this->get($key) !== FALSE) {
-      cache_clear_all(static::getKey($key), static::$cache_table);
+      cache_clear_all(static::getKey($key), static::$cacheTable);
     }
   }
 }
