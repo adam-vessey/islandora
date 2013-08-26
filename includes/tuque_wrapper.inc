@@ -350,7 +350,47 @@ class IslandoraFedoraApiM extends FedoraApiM {
 
 }
 
-class IslandoraSimpleCache extends SimpleCache {}
+class IslandoraSimpleCache implements AbstractCache {
+  protected static $cache_prefix = 'islandora_tuque_cache';
+  protected static $cache_table = 'cache';
+
+  public static function resetCache() {
+    cache_clear_all(static::$cache_prefix, static::$cache_table, TRUE);
+  }
+
+  protected static function getKey($key) {
+    return static::$cache_prefix . "_{$key}";
+  }
+
+  public function add($key, $data) {
+    if ($this->get($key) !== FALSE) {
+      return FALSE;
+    }
+
+    return $this->set($key, $data);
+  }
+
+  public function set($key, $data) {
+    cache_set(static::getKey($key), $data, static::$cache_table, CACHE_TEMPORARY);
+    return TRUE;
+  }
+
+  public function get($key) {
+    $cache_value = cache_get(static::getKey($key), static::$cache_table);
+    if ($cache_value !== FALSE) {
+      return $cache_value->data;
+    }
+    else {
+      return FALSE;
+    }
+  }
+
+  public function delete($key) {
+    if ($this->get($key) !== FALSE) {
+      cache_clear_all(static::getKey($key), static::$cache_table);
+    }
+  }
+}
 
 class IslandoraNewFedoraDatastream extends NewFedoraDatastream {
   protected $fedoraRelsIntClass = 'IslandoraFedoraRelsInt';
