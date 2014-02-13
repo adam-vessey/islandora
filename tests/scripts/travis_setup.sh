@@ -1,6 +1,5 @@
 #!/bin/bash
 
-echo $PATH
 mysql -u root -e 'create database drupal;'
 mysql -u root -e "create database fedora;"
 mysql -u root -e "GRANT ALL PRIVILEGES ON fedora.* To 'fedora'@'localhost' IDENTIFIED BY 'fedora';"
@@ -20,8 +19,7 @@ pear channel-discover pear.phpqatools.org
 pear channel-discover pear.netpirates.net
 pear install pear/PHP_CodeSniffer-1.4.8
 pear install pear.phpunit.de/phpcpd
-export PATH="$HOME/.composer/vendor/bin:$PATH"
-echo 'export PATH="$HOME/.composer/vendor/bin:$PATH"' >> $HOME/.bashrc
+sudo ln -s $HOME/.composer/vendor/bin/drush /usr/local/sbin
 composer global require --prefer-source drush/drush:6.x
 phpenv rehash
 drush dl --yes drupal
