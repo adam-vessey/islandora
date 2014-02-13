@@ -19,6 +19,7 @@ pear channel-discover pear.phpqatools.org
 pear channel-discover pear.netpirates.net
 pear install pear/PHP_CodeSniffer-1.4.8
 pear install pear.phpunit.de/phpcpd
+export PATH="$HOME/.composer/vendor/bin:$PATH"
 composer global require drush/drush:6.x
 phpenv rehash
 drush dl --yes drupal
