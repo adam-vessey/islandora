@@ -24,6 +24,6 @@ class IslandoraContradictionTestCase extends IslandoraWebTestCase {
    * A test which /will/ fail.
    */
   public function testContradiction() {
-    $this->assertTrue(FALSE, 'Test fail.');
+    $this->fail('Test fail.');
   }
 }
