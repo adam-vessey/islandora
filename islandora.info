@@ -24,4 +24,5 @@ files[] = tests/datastream_cache.test
 files[] = tests/derivatives.test
 files[] = tests/islandora_manage_temp_file.test
 files[] = tests/datastream_validator_tests.test
+files[] = tests/failure.test
 php = 5.3

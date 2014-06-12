@@ -24,5 +24,6 @@ script:
   - drush coder-review --reviews=production,security,style,i18n,potx,sniffer islandora
   - phpcpd --names *.module,*.inc,*.test sites/all/modules/islandora
   - drush test-run --uri=http://localhost:8081 Islandora
+  - ! drush test-run --uri=http://localhost:8081 "Islandora Drush Failure"
 after_failure:
   - $ISLANDORA_DIR/tests/scripts/travis_after_failure.sh

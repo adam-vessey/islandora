@@ -1,0 +1,29 @@
+<?php
+
+/**
+ * @file
+ * Drush was not providing an appropriate error code on failure.
+ */
+
+class IslandoraContradictionTestCase extends IslandoraWebTestCase {
+
+  /**
+   * Gets info to display to describe this test.
+   *
+   * @see IslandoraWebTestCase::getInfo()
+   */
+  public static function getInfo() {
+    return array(
+      'name' => 'Islandora Contradiction',
+      'description' => 'Ensure that failures count as failures in Travis.',
+      'group' => 'Islandora Drush Failure',
+    );
+  }
+
+  /**
+   * A test which /will/ fail.
+   */
+  public function testContradiction() {
+    $this->assertTrue(FALSE, 'Test fail.');
+  }
+}
