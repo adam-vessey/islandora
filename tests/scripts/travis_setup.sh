@@ -41,10 +41,9 @@ fi
 cd $HOME
 
 # Drupal installation.
-echo rehashing && phpenv rehash
 echo dling drupal && drush dl --yes drupal
 cd drupal-*
-echo installing drupal && drush si minimal --db-url=mysql://drupal:drupal@localhost/drupal --yes
+echo installing drupal && drush si minimal --db-url=mysqli://drupal:drupal@localhost/drupal --yes
 sudo cat sites/default/settings.php
 
 
