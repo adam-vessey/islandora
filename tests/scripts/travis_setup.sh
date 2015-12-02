@@ -8,11 +8,8 @@ mysql -u root -e "GRANT ALL PRIVILEGES ON drupal.* To 'drupal'@'localhost' IDENT
 
 # Java 8, if needed.
 if [ $FEDORA_VERSION = "3.8.1" ]; then
-  sudo add-apt-repository -y ppa:webupd8team/java
-  sudo apt-get update
-  sudo apt-get install -y oracle-java8-installer oracle-java8-set-default
-  sudo update-java-alternatives -s java-8-oracle
-  export JAVA_HOME=/usr/lib/jvm/java-8-oracle
+  jdk_switcher use oraclejdk8
+  export JAVA_HOME
 fi
 
 # Islandora Tomcat installation.
