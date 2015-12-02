@@ -9,6 +9,12 @@ composer global require 'drush/drush' 'squizlabs/php_codesniffer' 'sebastian/php
 echo linking && find $HOME/.composer/vendor/bin -executable \! -type d -exec sudo ln -s {}  /usr/local/sbin/ \;
 sudo apt-get install php5-mysql
 
+# Database creation and priveleges.
+mysql -u root -e 'create database drupal;'
+mysql -u root -e "create database fedora;"
+mysql -u root -e "GRANT ALL PRIVILEGES ON fedora.* To 'fedora'@'localhost' IDENTIFIED BY 'fedora';"
+mysql -u root -e "GRANT ALL PRIVILEGES ON drupal.* To 'drupal'@'localhost' IDENTIFIED BY 'drupal';"
+
 # Drupal installation.
 echo dling drupal && drush dl --yes drupal
 cd drupal-*
@@ -41,12 +47,6 @@ drush en --user=1 --yes islandora
 drush cc all
 # The shebang in this file is a bogeyman that is haunting the web test cases.
 rm /home/travis/.phpenv/rbenv.d/exec/hhvm-switcher.bash
-
-# Database creation and priveleges.
-mysql -u root -e 'create database drupal;'
-mysql -u root -e "create database fedora;"
-mysql -u root -e "GRANT ALL PRIVILEGES ON fedora.* To 'fedora'@'localhost' IDENTIFIED BY 'fedora';"
-mysql -u root -e "GRANT ALL PRIVILEGES ON drupal.* To 'drupal'@'localhost' IDENTIFIED BY 'drupal';"
 
 # Java 8, if needed.
 if [ $FEDORA_VERSION = "3.8.1" ]; then
