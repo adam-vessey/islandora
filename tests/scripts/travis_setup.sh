@@ -45,6 +45,7 @@ echo rehashing && phpenv rehash
 echo dling drupal && drush dl --yes drupal
 cd drupal-*
 echo installing drupal && drush si minimal --db-url=mysql://drupal:drupal@localhost/drupal --yes
+sudo cat sites/default/settings.php
 
 
 # Needs to make things from Composer be available (PHP CS, primarily)
