@@ -64,8 +64,8 @@ ln -s $HOME/tuque sites/all/libraries/tuque
 # Grab and enable other modules.
 drush dl --yes coder-7.x-2.4
 drush dl --yes potx-7.x-1.0
-drush en --yes coder_review
-drush en --yes simpletest
+drush --debug --verbose en --yes coder_review
+drush --debug --verbose en --yes simpletest
 drush en --yes potx
 drush en --user=1 --yes islandora
 drush cc all
