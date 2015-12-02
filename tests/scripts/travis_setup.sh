@@ -9,6 +9,7 @@ composer global require 'drush/drush' 'squizlabs/php_codesniffer' 'sebastian/php
 echo linking && find $HOME/.composer/vendor/bin -executable \! -type d -exec sudo ln -s {}  /usr/local/sbin/ \;
 sudo apt-get update
 sudo apt-get install php5-mysql
+phpenv rehash
 
 # Database creation and priveleges.
 mysql -u root -e 'create database drupal;'
