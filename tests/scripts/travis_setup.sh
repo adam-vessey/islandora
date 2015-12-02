@@ -29,29 +29,22 @@ fi
 
 # Drush installation.
 cd $HOME
-pear channel-discover pear.drush.org
-pear upgrade --force Console_Getopt
-pear upgrade --force pear
-pear channel-discover pear.drush.org
-wget http://alpha.library.yorku.ca/drush-6.3.tar.gz
-tar xf drush-6.3.tar.gz
-sudo mv drush-6.3 /opt/
-sudo ln -s /opt/drush-6.3/drush /usr/bin/drush
-
-# PHPCS installation.
-wget http://alpha.library.yorku.ca/PHP_CodeSniffer-1.5.6.tgz
-pear install PHP_CodeSniffer-1.5.6.tgz
-
-# PHP Copy-Paste Detection installation.
-wget http://alpha.library.yorku.ca/phpcpd.phar
-sudo mv phpcpd.phar /usr/local/bin/phpcpd
-sudo chmod +x /usr/local/bin/phpcpd
+composer global require drush/drush:6.3.0 squizlabs/php_codesniffer "sebastian/phpcpd=*"
+# Because we can't add to the PATH here and this file is used in many repos,
+# let's just throw symlinks into a directory already on the PATH.
+find $HOME/.composer/vendor/bin -executable \! -type d -exec sudo ln -s {}  /usr/local/sbin/ \;
 
 # Drupal installation.
 phpenv rehash
 drush dl --yes drupal
 cd drupal-*
 drush si minimal --db-url=mysql://drupal:drupal@localhost/drupal --yes
+
+# Needs to make things from Composer be available (PHP CS, primarily)
+chmod a+w sites/default/settings.php
+echo "include_once '$HOME/.composer/vendor/autoload.php';" >> sites/default/settings.php
+chmod a-w sites/default/settings.php
+
 drush runserver --php-cgi=$HOME/.phpenv/shims/php-cgi localhost:8081 &>/tmp/drush_webserver.log &
 # Add Islandora to the list of symlinked modules.
 ln -s $ISLANDORA_DIR sites/all/modules/islandora
