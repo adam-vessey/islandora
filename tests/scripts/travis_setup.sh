@@ -32,20 +32,22 @@ cd $HOME
 composer global require drush/drush:6.3.0 squizlabs/php_codesniffer "sebastian/phpcpd=*"
 # Because we can't add to the PATH here and this file is used in many repos,
 # let's just throw symlinks into a directory already on the PATH.
-find $HOME/.composer/vendor/bin -executable \! -type d -exec sudo ln -s {}  /usr/local/sbin/ \;
+echo linking && find $HOME/.composer/vendor/bin -executable \! -type d -exec sudo ln -s {}  /usr/local/sbin/ \;
 
 # Drupal installation.
-phpenv rehash
-drush dl --yes drupal
+echo rehashing && phpenv rehash
+echo dling drupal && drush dl --yes drupal
 cd drupal-*
-drush si minimal --db-url=mysql://drupal:drupal@localhost/drupal --yes
+echo installing drupal && drush si minimal --db-url=mysql://drupal:drupal@localhost/drupal --yes
 
 # Needs to make things from Composer be available (PHP CS, primarily)
 chmod a+w sites/default/settings.php
 echo "include_once '$HOME/.composer/vendor/autoload.php';" >> sites/default/settings.php
 chmod a-w sites/default/settings.php
+echo injected global composer stuff into Drupal install
 
 drush runserver --php-cgi=$HOME/.phpenv/shims/php-cgi localhost:8081 &>/tmp/drush_webserver.log &
+echo started server
 # Add Islandora to the list of symlinked modules.
 ln -s $ISLANDORA_DIR sites/all/modules/islandora
 # Use our custom Travis test config for Simpletest.
