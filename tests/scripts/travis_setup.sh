@@ -1,5 +1,9 @@
 #!/bin/bash
 
+cd $HOME
+composer self-update
+composer global require 'drush/drush' 'squizlabs/php_codesniffer' 'sebastian/phpcpd=*'
+
 # Database creation and priveleges.
 mysql -u root -e 'create database drupal;'
 mysql -u root -e "create database fedora;"
@@ -29,8 +33,6 @@ fi
 
 # Drush installation.
 cd $HOME
-composer self-update
-composer global require 'drush/drush' 'squizlabs/php_codesniffer' 'sebastian/phpcpd=*'
 # Because we can't add to the PATH here and this file is used in many repos,
 # let's just throw symlinks into a directory already on the PATH.
 echo linking && find $HOME/.composer/vendor/bin -executable \! -type d -exec sudo ln -s {}  /usr/local/sbin/ \;
