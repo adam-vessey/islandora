@@ -20,7 +20,7 @@ mysql -u root -e "GRANT ALL PRIVILEGES ON drupal.* To 'drupal'@'localhost' IDENT
 # Drupal installation.
 echo dling drupal && drush dl --yes drupal
 cd drupal-*
-echo installing drupal && drush --debug --verbose si minimal --db-su=root --db-url=mysql://drupal:drupal@localhost/drupal --yes
+echo installing drupal && drush --debug --verbose si minimal --db-su=root --db-url=mysql://drupal:drupal@127.0.0.1/drupal --yes
 sudo cat sites/default/settings.php
 
 
