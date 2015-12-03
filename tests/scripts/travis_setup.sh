@@ -22,6 +22,7 @@ echo dling drupal && drush dl --yes drupal
 cd drupal-*
 echo installing drupal && drush --debug --verbose si minimal --db-su=root --db-url=mysql://drupal:drupal@127.0.0.1/drupal --yes
 sudo cat sites/default/settings.php
+mysql -u root -D drupal -e "SELECT * FROM users;"
 
 
 # Needs to make things from Composer be available (PHP CS, primarily)
