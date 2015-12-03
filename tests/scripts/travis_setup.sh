@@ -31,6 +31,8 @@ echo "include_once '$HOME/.composer/vendor/autoload.php';" >> sites/default/sett
 sudo chmod a-w sites/default/settings.php
 echo injected global composer stuff into Drupal install
 
+sudo chmod a+x /etc/php5
+
 drush runserver --php-cgi=$HOME/.phpenv/shims/php-cgi localhost:8081 &>/tmp/drush_webserver.log &
 echo started server
 # Add Islandora to the list of symlinked modules.
