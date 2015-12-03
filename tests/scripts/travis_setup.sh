@@ -3,7 +3,7 @@
 # Drush installation.
 cd $HOME
 composer self-update
-composer global require 'drush/drush:^8.0' 'squizlabs/php_codesniffer' 'sebastian/phpcpd=*'
+composer global require 'drush/drush' 'squizlabs/php_codesniffer' 'sebastian/phpcpd=*'
 # Because we can't add to the PATH here and this file is used in many repos,
 # let's just throw symlinks into a directory already on the PATH.
 echo linking && find $HOME/.composer/vendor/bin -executable \! -type d -exec sudo ln -s {}  /usr/local/sbin/ \;
@@ -20,7 +20,7 @@ mysql -u root -e "GRANT ALL PRIVILEGES ON drupal.* To 'drupal'@'localhost' IDENT
 # Drupal installation.
 echo dling drupal && drush dl --yes drupal
 cd drupal-*
-echo installing drupal && drush --debug --verbose si minimal --db-url=mysql://drupal:drupal@localhost/drupal --yes
+echo installing drupal && drush --debug --verbose si minimal --db-su=root --db-url=mysql://drupal:drupal@localhost/drupal --yes
 sudo cat sites/default/settings.php
 
 
