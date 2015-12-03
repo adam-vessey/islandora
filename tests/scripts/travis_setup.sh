@@ -24,6 +24,7 @@ echo installing drupal && drush --debug --verbose si minimal --db-su=root --db-u
 sudo cat sites/default/settings.php
 mysql -u root -D drupal -e "SELECT * FROM users;"
 
+host default
 
 # Needs to make things from Composer be available (PHP CS, primarily)
 sudo chmod a+w sites/default/settings.php
