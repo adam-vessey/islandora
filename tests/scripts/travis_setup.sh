@@ -3,13 +3,13 @@
 # Drush installation.
 cd $HOME
 composer self-update
-if [ $RBENV_VERSION -eq '5.3.3' ] ; then
+if [ "$RBENV_VERSION" -eq '5.3.3' ] ; then
     composer global require 'drush/drush:^6.7'
 else
     composer global require 'drush/drush'
 fi
 
-composer global require 'squizlabs/php_codesniffer' 'sebastian/phpcpd=*'
+composer global require 'squizlabs/php_codesniffer:^1.5.6' 'sebastian/phpcpd=*'
 # Because we can't add to the PATH here and this file is used in many repos,
 # let's just throw symlinks into a directory already on the PATH.
 echo linking && find $HOME/.composer/vendor/bin -executable \! -type d -exec sudo ln -s {}  /usr/local/bin/ \;
