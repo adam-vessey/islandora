@@ -21,7 +21,7 @@ mysql -u root -e "GRANT ALL PRIVILEGES ON fedora.* To 'fedora'@'localhost' IDENT
 # Drupal installation.
 echo dling drupal && drush dl --yes drupal-7
 cd drupal-*
-echo installing drupal && drush --debug --verbose --yes si minimal --db-su=root --db-su-pw='' --db-url=mysqli://drupal:drupal@127.0.0.1:3306/drupal
+echo installing drupal && drush --debug --verbose --yes si minimal --db-su=root --db-su-pw='' --db-url=mysqli://drupal:drupal@localhost:3306/drupal
 mysql -u root -D drupal -e "SELECT * FROM users;"
 
 drush core-status
