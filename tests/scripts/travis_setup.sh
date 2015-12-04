@@ -12,15 +12,15 @@ sudo apt-get install php5-mysql php5-gd
 phpenv rehash
 
 # Database creation and priveleges.
-mysql -u root -e 'create database drupal;'
+#mysql -u root -e 'create database drupal;'
 mysql -u root -e "create database fedora;"
 mysql -u root -e "GRANT ALL PRIVILEGES ON fedora.* To 'fedora'@'localhost' IDENTIFIED BY 'fedora';"
-mysql -u root -e "GRANT ALL PRIVILEGES ON drupal.* To 'drupal'@'localhost' IDENTIFIED BY 'drupal';"
+#mysql -u root -e "GRANT ALL PRIVILEGES ON drupal.* To 'drupal'@'localhost' IDENTIFIED BY 'drupal';"
 
 # Drupal installation.
 echo dling drupal && drush dl --yes drupal-7
 cd drupal-*
-echo installing drupal && drush --debug --verbose --yes si minimal --db-su=root --db-url=mysqli://drupal:drupal@127.0.0.1:3306/drupal
+echo installing drupal && drush --debug --verbose --yes si minimal --db-su=root --db-su-pw='' --db-url=mysqli://drupal:drupal@127.0.0.1:3306/drupal
 mysql -u root -D drupal -e "SELECT * FROM users;"
 
 drush core-status
