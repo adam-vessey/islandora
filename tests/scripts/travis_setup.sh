@@ -18,7 +18,7 @@ mysql -u root -e "GRANT ALL PRIVILEGES ON fedora.* To 'fedora'@'localhost' IDENT
 mysql -u root -e "GRANT ALL PRIVILEGES ON drupal.* To 'drupal'@'localhost' IDENTIFIED BY 'drupal';"
 
 # Drupal installation.
-echo dling drupal && drush dl --yes drupal
+echo dling drupal && drush dl --yes drupal-7
 cd drupal-*
 echo installing drupal && drush --debug --verbose si minimal --db-su=root --db-url=mysql://drupal:drupal@127.0.0.1/drupal --yes
 mysql -u root -D drupal -e "SELECT * FROM users;"
