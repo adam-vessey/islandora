@@ -18,12 +18,12 @@ echo linking && find $HOME/.composer/vendor/bin -executable \! -type d -exec sud
 mysql -u root -e 'create database drupal;'
 mysql -u root -e "create database fedora;"
 mysql -u root -e "GRANT ALL PRIVILEGES ON fedora.* To 'fedora'@'localhost' IDENTIFIED BY 'fedora';"
-mysql -u root -e "GRANT ALL PRIVILEGES ON drupal.* To 'drupal'@'localhost' IDENTIFIED BY 'drupal';"
+mysql -u root -e "GRANT ALL PRIVILEGES ON drupal.* To 'drupal'@'%' IDENTIFIED BY 'drupal';"
 
 # Drupal installation.
 echo dling drupal && drush dl --yes drupal-7
 cd drupal-*
-echo installing drupal && drush --debug --verbose --yes si minimal --db-su=root --db-su-pw='' --db-url=mysqli://drupal:drupal@localhost:3306/drupal
+echo installing drupal && drush --debug --verbose --yes si minimal --db-su=root --db-su-pw='' --db-url=mysql://drupal:drupal@localhost:3306/drupal
 mysql -u root -D drupal -e "SELECT * FROM users;"
 
 drush core-status
@@ -64,15 +64,6 @@ drush core-status
 # The shebang in this file is a bogeyman that is haunting the web test cases.
 rm /home/travis/.phpenv/rbenv.d/exec/hhvm-switcher.bash
 
-# Java 8, if needed.
-if [ $FEDORA_VERSION = "3.8.1" ]; then
-  sudo add-apt-repository -y ppa:webupd8team/java
-  sudo apt-get update
-  sudo apt-get install -y oracle-java8-installer oracle-java8-set-default
-  sudo update-java-alternatives -s java-8-oracle
-  export JAVA_HOME=/usr/lib/jvm/java-8-oracle
-fi
-
 # Islandora Tomcat installation.
 cd $HOME
 git clone git://github.com/Islandora/tuque.git
@@ -83,6 +74,13 @@ export CATALINA_HOME='.'
 export JAVA_OPTS="-Xms1024m -Xmx1024m -XX:MaxPermSize=512m -XX:+CMSClassUnloadingEnabled -Djavax.net.ssl.trustStore=$CATALINA_HOME/fedora/server/truststore -Djavax.net.ssl.trustStorePassword=tomcat"
 # TODO: roll a Fedora 3.8.1 islandora_tomcat that doesn't require a rebuild.
 if [ $FEDORA_VERSION = "3.8.1" ]; then
+  # Java 8, if needed.
+  sudo add-apt-repository -y ppa:webupd8team/java
+  sudo apt-get update
+  sudo apt-get install -y oracle-java8-installer oracle-java8-set-default
+  sudo update-java-alternatives -s java-8-oracle
+  export JAVA_HOME=/usr/lib/jvm/java-8-oracle
+
   export FEDORA_HOME=fedora
   ./fedora/server/bin/fedora-rebuild.sh -r org.fcrepo.server.utilities.rebuild.SQLRebuilder
 fi
