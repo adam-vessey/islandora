@@ -20,7 +20,7 @@ mysql -u root -e "GRANT ALL PRIVILEGES ON drupal.* To 'drupal'@'localhost' IDENT
 # Drupal installation.
 echo dling drupal && drush dl --yes drupal-7
 cd drupal-*
-echo installing drupal && drush --debug --verbose si minimal --db-su=root --db-url=mysql://drupal:drupal@127.0.0.1/drupal --yes
+echo installing drupal && drush --debug --verbose --yes si minimal --db-su=root --db-url=mysqli://drupal:drupal@127.0.0.1:3306/drupal
 mysql -u root -D drupal -e "SELECT * FROM users;"
 
 # Needs to make things from Composer be available (PHP CS, primarily)
