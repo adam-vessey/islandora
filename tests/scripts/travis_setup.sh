@@ -32,6 +32,8 @@ echo injected global composer stuff into Drupal install
 sudo cat sites/default/settings.php
 which drush -a
 
+drush core-status
+
 drush runserver --php-cgi=$HOME/.phpenv/shims/php-cgi localhost:8081 &>/tmp/drush_webserver.log &
 echo started server
 # Add Islandora to the list of symlinked modules.
@@ -41,6 +43,7 @@ mv sites/all/modules/islandora/tests/travis.test_config.ini sites/all/modules/is
 # Grab Tuque.
 mkdir sites/all/libraries
 ln -s $HOME/tuque sites/all/libraries/tuque
+drush core-status
 # Grab and enable other modules.
 drush dl --yes coder-7.x-2.4
 drush dl --yes potx-7.x-1.0
@@ -48,7 +51,9 @@ drush --debug --verbose en --yes coder_review
 drush --debug --verbose en --yes simpletest
 drush en --yes potx
 drush en --user=1 --yes islandora
+drush core-status
 drush cc all
+drush core-status
 # The shebang in this file is a bogeyman that is haunting the web test cases.
 rm /home/travis/.phpenv/rbenv.d/exec/hhvm-switcher.bash
 
