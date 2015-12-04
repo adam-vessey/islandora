@@ -3,7 +3,7 @@
 # Drush installation.
 cd $HOME
 composer self-update
-if [ $RBENV_VERSION -e '5.3.3' ] ; then
+if [ $RBENV_VERSION -eq '5.3.3' ] ; then
     composer global require 'drush/drush:^6.7'
 else
     composer global require 'drush/drush'
