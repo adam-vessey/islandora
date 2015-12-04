@@ -25,6 +25,8 @@ mysql -u root -D drupal -e "SELECT * FROM users;"
 
 drush core-status
 
+drush php-eval "phpinfo();"
+
 # Needs to make things from Composer be available (PHP CS, primarily)
 sudo chmod a+w sites/default/settings.php
 echo "include_once '$HOME/.composer/vendor/autoload.php';" >> sites/default/settings.php
