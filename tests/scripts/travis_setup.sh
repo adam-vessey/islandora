@@ -3,19 +3,20 @@
 # Drush installation.
 cd $HOME
 composer self-update
-composer global require 'drush/drush' 'squizlabs/php_codesniffer' 'sebastian/phpcpd=*'
+if [ $RBENV_VERSION -e '5.3.3' ] ; then
+    composer global require 'drush/drush:^6.7'
+else
+    composer global require 'drush/drush'
+fi
+
+composer global require 'squizlabs/php_codesniffer' 'sebastian/phpcpd=*'
 # Because we can't add to the PATH here and this file is used in many repos,
 # let's just throw symlinks into a directory already on the PATH.
 echo linking && find $HOME/.composer/vendor/bin -executable \! -type d -exec sudo ln -s {}  /usr/local/bin/ \;
-sudo apt-get update
-sudo apt-get install php5-mysql php5-gd
-phpenv rehash
 
 # Database creation and priveleges.
-#mysql -u root -e 'create database drupal;'
 mysql -u root -e "create database fedora;"
 mysql -u root -e "GRANT ALL PRIVILEGES ON fedora.* To 'fedora'@'localhost' IDENTIFIED BY 'fedora';"
-#mysql -u root -e "GRANT ALL PRIVILEGES ON drupal.* To 'drupal'@'localhost' IDENTIFIED BY 'drupal';"
 
 # Drupal installation.
 echo dling drupal && drush dl --yes drupal-7
