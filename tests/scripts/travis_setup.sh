@@ -21,10 +21,7 @@ mysql -u root -e "GRANT ALL PRIVILEGES ON drupal.* To 'drupal'@'localhost' IDENT
 echo dling drupal && drush dl --yes drupal
 cd drupal-*
 echo installing drupal && drush --debug --verbose si minimal --db-su=root --db-url=mysql://drupal:drupal@127.0.0.1/drupal --yes
-sudo cat sites/default/settings.php
 mysql -u root -D drupal -e "SELECT * FROM users;"
-
-host default
 
 # Needs to make things from Composer be available (PHP CS, primarily)
 sudo chmod a+w sites/default/settings.php
@@ -32,7 +29,8 @@ echo "include_once '$HOME/.composer/vendor/autoload.php';" >> sites/default/sett
 sudo chmod a-w sites/default/settings.php
 echo injected global composer stuff into Drupal install
 
-sudo chmod a+x /etc/php5
+sudo cat sites/default/settings.php
+which drush -a
 
 drush runserver --php-cgi=$HOME/.phpenv/shims/php-cgi localhost:8081 &>/tmp/drush_webserver.log &
 echo started server
