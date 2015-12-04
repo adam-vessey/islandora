@@ -3,7 +3,7 @@
 # Drush installation.
 cd $HOME
 composer self-update
-if [ "$RBENV_VERSION" = '5.3.3' ] ; then
+if [ "$TRAVIS_PHP_VERSION" = '5.3.3' ] ; then
     composer global require 'drush/drush:^6.7'
 else
     composer global require 'drush/drush'
