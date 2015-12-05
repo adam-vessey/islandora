@@ -1,5 +1,6 @@
 #!/bin/bash
 
+
 # Drush installation.
 cd $HOME
 composer self-update
@@ -10,7 +11,8 @@ if [ "$TRAVIS_PHP_VERSION" = '5.3.3' ] ; then
 else
     composer global require 'drush/drush'
 fi
-alias drush="$HOME/.composer/vendor/bin/drush --verbose"
+export PATH=$PATH:$HOME/.composer/vendor/bin
+alias drush="drush --verbose --yes"
 
 composer global require 'sebastian/phpcpd=*'
 
@@ -21,9 +23,9 @@ mysql -u root -e "GRANT ALL PRIVILEGES ON fedora.* To 'fedora'@'localhost' IDENT
 mysql -u root -e "GRANT ALL PRIVILEGES ON drupal.* To 'drupal'@'localhost' IDENTIFIED BY 'drupal';"
 
 # Drupal installation.
-drush dl --yes drupal-7
+drush dl drupal-7
 cd drupal-*
-drush --debug --verbose --yes si minimal --db-url=mysql://drupal:drupal@localhost/drupal
+drush si minimal --db-url=mysql://drupal:drupal@localhost/drupal
 mysql -u root -D drupal -e "SELECT * FROM users;"
 
 # Needs to make things from Composer be available (PHP CS, primarily)
@@ -44,17 +46,17 @@ mkdir sites/all/libraries
 ln -s $HOME/tuque sites/all/libraries/tuque
 
 # Grab and enable other modules.
-drush dl --yes coder
+drush dl coder
 
 pushd sites/all/modules/coder
 # Install coder requirements.
 composer global install
 popd
 
-drush dl --yes potx-7.x-1.0
-drush --verbose en --yes coder_review
-drush --verbose en --yes simpletest
-drush en --yes potx
+drush dl potx-7.x-1.0
+drush en coder_review
+drush en simpletest
+drush en potx
 # The shebang in this file is a bogeyman that is haunting the web test cases.
 rm /home/travis/.phpenv/rbenv.d/exec/hhvm-switcher.bash
 
@@ -82,7 +84,7 @@ fi
 sleep 20
 
 cd $HOME/drupal-7*
-drush en --user=1 --yes islandora
+drush en --user=1 islandora
 drush cc all
 drush core-status
 
