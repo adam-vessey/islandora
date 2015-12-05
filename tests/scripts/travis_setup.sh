@@ -4,16 +4,15 @@
 cd $HOME
 composer self-update
 if [ "$TRAVIS_PHP_VERSION" = '5.3.3' ] ; then
+    # XXX: PHP 5.3.3 and drush 7.1.0 (the version it would otherwise download)
+    # don't play nice: https://github.com/drush-ops/drush/issues/544
     composer global require 'drush/drush:^6.7'
 else
     composer global require 'drush/drush'
 fi
+alias drush="$HOME/.composer/vendor/bin/drush --verbose"
 
-composer global require 'squizlabs/php_codesniffer:^1.5.6' 'sebastian/phpcpd=*'
-# Because we can't add to the PATH here and this file is used in many repos,
-# let's just throw symlinks into a directory already on the PATH.
-echo linking && find $HOME/.composer/vendor/bin -executable \! -type d -exec sudo ln -s {}  /usr/local/bin/ \;
-alias drush="drush --verbose"
+composer global require 'sebastian/phpcpd=*'
 
 # Database creation and priveleges.
 mysql -u root -e 'create database drupal;'
@@ -45,7 +44,13 @@ mkdir sites/all/libraries
 ln -s $HOME/tuque sites/all/libraries/tuque
 
 # Grab and enable other modules.
-drush dl --yes coder-7.x-2.4
+drush dl --yes coder
+
+pushd sites/all/modules/coder
+# Install coder requirements.
+composer global install
+popd
+
 drush dl --yes potx-7.x-1.0
 drush --verbose en --yes coder_review
 drush --verbose en --yes simpletest
@@ -74,9 +79,14 @@ if [ $FEDORA_VERSION = "3.8.1" ]; then
   ./fedora/server/bin/fedora-rebuild.sh -r org.fcrepo.server.utilities.rebuild.SQLRebuilder
 fi
 ./bin/startup.sh
+sleep 20
 
 cd $HOME/drupal-7*
 drush en --user=1 --yes islandora
 drush cc all
 drush core-status
-sleep 20
+
+# Because we can't add to the PATH here and this file is used in many repos,
+# let's just throw symlinks into a directory already on the PATH.
+echo linking && find $HOME/.composer/vendor/bin -executable \! -type d -exec sudo ln -s {}  /usr/local/bin/ \;
+
