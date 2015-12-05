@@ -1,22 +1,19 @@
 #!/bin/bash
 
-# Drush installation.
-cd $HOME
 composer self-update
-if [ "$TRAVIS_PHP_VERSION" = '5.3.3' ] ; then
-    # XXX: PHP 5.3.3 and drush 7.1.0 (the version it would otherwise download)
-    # don't play nice: https://github.com/drush-ops/drush/issues/544
-    composer global require 'drush/drush:^6.7'
-else
-    composer global require 'drush/drush'
-fi
-# XXX: This is for this file... Doesn't make it out to the Travis build in
-# general unless this file get source'd.
-export PATH=$PATH:$HOME/.composer/vendor/bin
-alias drush="drush --verbose"
 
+cd $HOME
+# Install drush, PHP CS and PHP CPD.
+# XXX: PHP 5.3.3 and drush 7.1.0 (the version it would otherwise download)
+# don't play nice: https://github.com/drush-ops/drush/issues/544
 # XXX: Coder is not compatible with PHP CS 2.x.
-composer global require 'squizlabs/php_codesniffer:^1.4.6' 'sebastian/phpcpd=*'
+composer global require 'drush/drush:^6.7' 'squizlabs/php_codesniffer:^1.4.6' 'sebastian/phpcpd=*'
+
+# Because we can't add to the PATH here and this file is used in many repos,
+# let's just throw symlinks into a directory already on the PATH.
+find $HOME/.composer/vendor/bin -executable \! -type d -exec sudo ln -s {}  /usr/local/bin/ \;
+
+alias drush="drush --verbose"
 
 # Database creation and priveleges.
 mysql -u root -e 'create database drupal;'
@@ -75,13 +72,10 @@ fi
 sleep 20
 
 cd $HOME/drupal-7*
+# XXX: Needs be be after Fedora, so islandora can install its objects.
 drush --user=1 en --yes islandora
 drush cc all
 drush runserver --php-cgi=$HOME/.phpenv/shims/php-cgi localhost:8081 &>/tmp/drush_webserver.log &
 
-# Because we can't add to the PATH here and this file is used in many repos,
-# let's just throw symlinks into a directory already on the PATH.
-echo linking && find $HOME/.composer/vendor/bin -executable \! -type d -exec sudo ln -s {}  /usr/local/bin/ \;
-
-# The shebang in this file is a bogeyman that is haunting the web test cases.
+# XXX: The shebang in this file is a bogeyman haunting the web test cases.
 rm /home/travis/.phpenv/rbenv.d/exec/hhvm-switcher.bash
