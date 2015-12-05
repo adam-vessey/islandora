@@ -4,9 +4,12 @@ composer self-update
 
 cd $HOME
 # Install drush, PHP CS and PHP CPD.
-# XXX: PHP 5.3.3 and drush 7.1.0 (the version it would otherwise download)
-# don't play nice: https://github.com/drush-ops/drush/issues/544
-# XXX: Coder is not compatible with PHP CS 2.x.
+# XXX: Version ^6.7 of drush specified because:
+# - drush test-run was dropped for drush 7.x:
+#   https://github.com/drush-ops/drush/issues/1362
+# - PHP 5.3.3 and drush 7.1.0 (the version it would otherwise download in the
+#   5.3.3 build) don't play nice: https://github.com/drush-ops/drush/issues/544
+# XXX: Version ^1.4.6 of PHP CS because coder is not compatible with PHP CS 2.x.
 composer global require 'drush/drush:^6.7' 'squizlabs/php_codesniffer:^1.4.6' 'sebastian/phpcpd=*'
 
 # Because we can't add to the PATH here and this file is used in many repos,
@@ -26,7 +29,7 @@ drush dl --yes drupal-7
 cd drupal-*
 drush si --yes minimal --db-url=mysql://drupal:drupal@localhost/drupal
 
-# Needs to make things from Composer be available (PHP CS, primarily)
+# Needs to make things from Composer be available to Drupal (PHP CS, primarily)
 sudo chmod a+w sites/default/settings.php
 echo "include_once '$HOME/.composer/vendor/autoload.php';" >> sites/default/settings.php
 sudo chmod a-w sites/default/settings.php
