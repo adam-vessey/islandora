@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 # Drush installation.
 cd $HOME
 composer self-update
@@ -11,6 +10,8 @@ if [ "$TRAVIS_PHP_VERSION" = '5.3.3' ] ; then
 else
     composer global require 'drush/drush'
 fi
+# XXX: This is for this file... Doesn't make it out to the Travis build in
+# general unless this file get source'd.
 export PATH=$PATH:$HOME/.composer/vendor/bin
 alias drush="drush --verbose"
 
@@ -27,14 +28,11 @@ mysql -u root -e "GRANT ALL PRIVILEGES ON drupal.* To 'drupal'@'localhost' IDENT
 drush dl --yes drupal-7
 cd drupal-*
 drush si --yes minimal --db-url=mysql://drupal:drupal@localhost/drupal
-mysql -u root -D drupal -e "SELECT * FROM users;"
 
 # Needs to make things from Composer be available (PHP CS, primarily)
 sudo chmod a+w sites/default/settings.php
 echo "include_once '$HOME/.composer/vendor/autoload.php';" >> sites/default/settings.php
 sudo chmod a-w sites/default/settings.php
-
-drush runserver --php-cgi=$HOME/.phpenv/shims/php-cgi localhost:8081 &>/tmp/drush_webserver.log &
 
 # Add Islandora to the list of symlinked modules.
 ln -s $ISLANDORA_DIR sites/all/modules/islandora
@@ -48,13 +46,10 @@ ln -s $HOME/tuque sites/all/libraries/tuque
 
 # Grab and enable other modules.
 drush dl --yes coder-7.x-2.5
-
 drush dl --yes potx-7.x-1.0
 drush en --yes coder_review
 drush en --yes simpletest
 drush en --yes potx
-# The shebang in this file is a bogeyman that is haunting the web test cases.
-rm /home/travis/.phpenv/rbenv.d/exec/hhvm-switcher.bash
 
 # Islandora Tomcat installation.
 cd $HOME
@@ -82,9 +77,11 @@ sleep 20
 cd $HOME/drupal-7*
 drush --user=1 en --yes islandora
 drush cc all
-drush core-status
+drush runserver --php-cgi=$HOME/.phpenv/shims/php-cgi localhost:8081 &>/tmp/drush_webserver.log &
 
 # Because we can't add to the PATH here and this file is used in many repos,
 # let's just throw symlinks into a directory already on the PATH.
 echo linking && find $HOME/.composer/vendor/bin -executable \! -type d -exec sudo ln -s {}  /usr/local/bin/ \;
 
+# The shebang in this file is a bogeyman that is haunting the web test cases.
+rm /home/travis/.phpenv/rbenv.d/exec/hhvm-switcher.bash
