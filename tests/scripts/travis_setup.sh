@@ -23,7 +23,7 @@ mysql -u root -e "GRANT ALL PRIVILEGES ON drupal.* To 'drupal'@'%' IDENTIFIED BY
 # Drupal installation.
 echo dling drupal && drush dl --yes drupal-7
 cd drupal-*
-echo installing drupal && drush --debug --verbose --yes si minimal --db-url=mysql://drupal:drupal@localhost:3306/drupal
+echo installing drupal && drush --debug --verbose --yes si minimal --db-url=mysql://drupal:drupal@localhost/drupal
 mysql -u root -D drupal -e "SELECT * FROM users;"
 
 drush core-status
