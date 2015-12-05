@@ -21,36 +21,28 @@ mysql -u root -e "GRANT ALL PRIVILEGES ON fedora.* To 'fedora'@'localhost' IDENT
 mysql -u root -e "GRANT ALL PRIVILEGES ON drupal.* To 'drupal'@'localhost' IDENTIFIED BY 'drupal';"
 
 # Drupal installation.
-echo dling drupal && drush dl --yes drupal-7
+drush dl --yes drupal-7
 cd drupal-*
-echo installing drupal && drush --debug --verbose --yes si minimal --db-url=mysql://drupal:drupal@localhost/drupal
+drush --debug --verbose --yes si minimal --db-url=mysql://drupal:drupal@localhost/drupal
 mysql -u root -D drupal -e "SELECT * FROM users;"
-
-drush core-status
-
-drush php-eval "phpinfo();"
 
 # Needs to make things from Composer be available (PHP CS, primarily)
 sudo chmod a+w sites/default/settings.php
 echo "include_once '$HOME/.composer/vendor/autoload.php';" >> sites/default/settings.php
 sudo chmod a-w sites/default/settings.php
-echo injected global composer stuff into Drupal install
-
-sudo cat sites/default/settings.php
-which drush -a
-
-drush core-status
 
 drush runserver --php-cgi=$HOME/.phpenv/shims/php-cgi localhost:8081 &>/tmp/drush_webserver.log &
-echo started server
+
 # Add Islandora to the list of symlinked modules.
 ln -s $ISLANDORA_DIR sites/all/modules/islandora
+
 # Use our custom Travis test config for Simpletest.
 mv sites/all/modules/islandora/tests/travis.test_config.ini sites/all/modules/islandora/tests/test_config.ini
+
 # Grab Tuque.
 mkdir sites/all/libraries
 ln -s $HOME/tuque sites/all/libraries/tuque
-drush core-status
+
 # Grab and enable other modules.
 drush dl --yes coder-7.x-2.4
 drush dl --yes potx-7.x-1.0
@@ -58,7 +50,6 @@ drush --debug --verbose en --yes coder_review
 drush --debug --verbose en --yes simpletest
 drush en --yes potx
 drush en --user=1 --yes islandora
-drush core-status
 drush cc all
 drush core-status
 # The shebang in this file is a bogeyman that is haunting the web test cases.
