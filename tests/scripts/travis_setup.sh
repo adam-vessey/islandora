@@ -46,7 +46,7 @@ mkdir sites/all/libraries
 ln -s $HOME/tuque sites/all/libraries/tuque
 
 # Grab and enable other modules.
-drush dl --yes coder
+drush dl --yes coder-7.x-2.5
 
 pushd sites/all/modules/coder
 # Install coder requirements.
