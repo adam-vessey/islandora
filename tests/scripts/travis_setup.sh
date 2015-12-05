@@ -18,7 +18,7 @@ echo linking && find $HOME/.composer/vendor/bin -executable \! -type d -exec sud
 mysql -u root -e 'create database drupal;'
 mysql -u root -e "create database fedora;"
 mysql -u root -e "GRANT ALL PRIVILEGES ON fedora.* To 'fedora'@'localhost' IDENTIFIED BY 'fedora';"
-mysql -u root -e "GRANT ALL PRIVILEGES ON drupal.* To 'drupal'@'%' IDENTIFIED BY 'drupal';"
+mysql -u root -e "GRANT ALL PRIVILEGES ON drupal.* To 'drupal'@'localhost' IDENTIFIED BY 'drupal';"
 
 # Drupal installation.
 echo dling drupal && drush dl --yes drupal-7
