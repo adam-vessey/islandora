@@ -1,7 +1,5 @@
 #!/bin/bash
 
-cat ~/islandora_tomcat/logs/catalina.out
-
 # Get the end portion of the TRAVIS_REPO_SLUG for the branch name.
 IFS=/ read -a DELIMITED_SLUG <<< "$TRAVIS_REPO_SLUG"
 export CURRENT_REPO=${DELIMITED_SLUG[1]}
