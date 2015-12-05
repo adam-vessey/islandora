@@ -75,6 +75,7 @@ if [ $FEDORA_VERSION = "3.8.1" ]; then
 fi
 ./bin/startup.sh
 
+cd $HOME/drupal-7*
 drush en --user=1 --yes islandora
 drush cc all
 drush core-status
