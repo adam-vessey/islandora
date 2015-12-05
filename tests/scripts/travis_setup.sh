@@ -14,7 +14,8 @@ fi
 export PATH=$PATH:$HOME/.composer/vendor/bin
 alias drush="drush --verbose"
 
-composer global require 'sebastian/phpcpd=*'
+# XXX: Coder is not compatible with PHP CS 2.x.
+composer global require 'squizlabs/php_codesniffer:^1.4.6' 'sebastian/phpcpd=*'
 
 # Database creation and priveleges.
 mysql -u root -e 'create database drupal;'
@@ -47,11 +48,6 @@ ln -s $HOME/tuque sites/all/libraries/tuque
 
 # Grab and enable other modules.
 drush dl --yes coder-7.x-2.5
-
-pushd sites/all/modules/coder
-# Install coder requirements.
-composer global install
-popd
 
 drush dl --yes potx-7.x-1.0
 drush en --yes coder_review
