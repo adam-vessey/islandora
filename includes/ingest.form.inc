@@ -922,6 +922,36 @@ function islandora_ingest_form_get_steps(array &$form_state) {
 }
 
 /**
+ * Implements hook_form_alter().
+ */
+function islandora_form_islandora_ingest_form_alter(&$form, &$form_state) {
+  // Check if multiple content models are available to select from.
+  if (count($form_state['islandora']['step_storage']['islandora_basic_collection_select_content_model']['models']) > 1) {
+    if (!isset($form_state['islandora']['step_storage']['active_cmodel']) &&
+      isset($form_state['islandora']['step_storage']['islandora_basic_collection_select_content_model']['values'])) {
+      $model = $form_state['islandora']['step_storage']['islandora_basic_collection_select_content_model']['values']['models'];
+      $form_state['islandora']['step_storage']['active_cmodel'] = islandora_object_load($model);
+    }
+  }
+  else {
+    // Keep a reference to the only available cmodel, if it does not
+    // already exist.
+    if (!isset($form_state['islandora']['step_storage']['active_cmodel'])) {
+      $model = $form_state['islandora']['step_storage']['islandora_basic_collection_select_content_model']['models'][0];
+      $form_state['islandora']['step_storage']['active_cmodel'] = islandora_object_load($model);
+    }
+  }
+
+  if (isset($form_state['islandora']['step_storage']['active_cmodel'])) {
+    $label = $form_state['islandora']['step_storage']['active_cmodel']->{'label'};
+    $form['contact_information'] = array(
+      '#markup' => "<h3>$label</h3>",
+      '#weight' => -1000,
+    );
+  }
+}
+
+/**
  * Filter the ingest steps to only steps of type 'form'.
  *
  * @param array $form_state
