@@ -927,11 +927,13 @@ function islandora_ingest_form_get_steps(array &$form_state) {
 function islandora_form_islandora_ingest_form_alter(&$form, &$form_state) {
   foreach ($form_state['islandora']['shared_storage']['models'] as $key => $cmodel) {
     $fedora_cmodel = islandora_object_load($cmodel);
-    $cmodel_label = $fedora_cmodel->{'label'};
-    $form["contact_information_$key"] = array(
-      '#markup' => "<h3>$cmodel_label</h3></br>",
-      '#weight' => -1000,
-    );
+    if ($fedora_cmodel) {
+      $form["contact_information_$key"] = array(
+        '#markup' => "<h3>$fedora_cmodel->label</h3></br>",
+        '#weight' => -1000,
+      );
+    }
+
   }
 }
 
