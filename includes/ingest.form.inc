@@ -476,9 +476,36 @@ function islandora_ingest_form_stepify(array $form, array &$form_state, array $s
     $form['hidden_next']['#prefix'] = '<div style="display:none;">';
     $form['hidden_next']['#suffix'] = '</div>';
   }
+
+  // Add active CModel header to the form.
+  islandora_ingest_form_add_step_context($form, $form_state);
+
   // Allow for a hook_form_FORM_ID_alter().
   drupal_alter(array('form_' . $step['form_id'], 'form'), $form, $form_state, $step['form_id']);
   return $form;
+}
+
+/**
+ * Append CModel label to the top of the step's form.
+ *
+ * @param array $form
+ *   The Drupal form.
+ * @param array $form_state
+ *   The Drupal form state.
+ */
+function islandora_ingest_form_add_step_context(array &$form, array $form_state) {
+  foreach ($form_state['islandora']['shared_storage']['models'] as $key => $value) {
+    $fedora_cmodel = islandora_object_load($value);
+    if ($fedora_cmodel) {
+      $policy = new CollectionPolicy($form_state['islandora']['shared_storage']['collection']['COLLECTION_POLICY']->content);
+      $policy_content_models = $policy->getContentModels();
+      $label = isset($policy_content_models[$value]) ? $policy_content_models[$value]['name'] : $fedora_cmodel->label;
+      $form["context_info_$key"] = array(
+        '#markup' => "<h3>$label</h3></br>",
+        '#weight' => -1000,
+      );
+    }
+  }
 }
 
 /**
@@ -919,22 +946,6 @@ function islandora_ingest_form_get_steps(array &$form_state) {
   }
   uasort($steps, 'drupal_sort_weight');
   return $steps;
-}
-
-/**
- * Implements hook_form_alter().
- */
-function islandora_form_islandora_ingest_form_alter(&$form, &$form_state) {
-  foreach ($form_state['islandora']['shared_storage']['models'] as $key => $cmodel) {
-    $fedora_cmodel = islandora_object_load($cmodel);
-    if ($fedora_cmodel) {
-      $form["contact_information_$key"] = array(
-        '#markup' => "<h3>$fedora_cmodel->label</h3></br>",
-        '#weight' => -1000,
-      );
-    }
-
-  }
 }
 
 /**
