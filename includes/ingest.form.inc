@@ -500,7 +500,7 @@ function islandora_ingest_form_add_step_context(array &$form, array $form_state)
       $policy = new CollectionPolicy($form_state['islandora']['shared_storage']['collection']['COLLECTION_POLICY']->content);
       $policy_content_models = $policy->getContentModels();
       $label = isset($policy_content_models[$value]) ? $policy_content_models[$value]['name'] : $fedora_cmodel->label;
-      $form["context_info_$key"] = array(
+      $form["ci_$key"] = array(
         '#markup' => "<h3>$label</h3></br>",
         '#weight' => -1000,
       );
