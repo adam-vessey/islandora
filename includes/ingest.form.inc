@@ -497,11 +497,27 @@ function islandora_ingest_form_add_step_context(array &$form, array $form_state)
   foreach ($form_state['islandora']['shared_storage']['models'] as $key => $value) {
     $fedora_cmodel = islandora_object_load($value);
     if ($fedora_cmodel) {
-      $policy = new CollectionPolicy($form_state['islandora']['shared_storage']['collection']['COLLECTION_POLICY']->content);
-      $policy_content_models = $policy->getContentModels();
-      $label = isset($policy_content_models[$value]) ? $policy_content_models[$value]['name'] : $fedora_cmodel->label;
-      $form["ci_$key"] = array(
-        '#markup' => "<h3>$label</h3></br>",
+      $items = array();
+      if (is_array($form_state['islandora']['shared_storage']['collection'])) {
+        // Form state config allows for multiple collection objects.
+        foreach ($form_state['islandora']['shared_storage']['collection'] as &$collection) {
+          $policy = new CollectionPolicy($collection['COLLECTION_POLICY']->content);
+          $policy_content_models = $policy->getContentModels();
+          $label = isset($policy_content_models[$value]) ? $policy_content_models[$value]['name'] : $fedora_cmodel->label;
+          $items[] = $label;
+        }
+      }
+      else {
+        $policy = new CollectionPolicy($form_state['islandora']['shared_storage']['collection']['COLLECTION_POLICY']->content);
+        $policy_content_models = $policy->getContentModels();
+        $label = isset($policy_content_models[$value]) ? $policy_content_models[$value]['name'] : $fedora_cmodel->label;
+        $items[] = $label;
+      }
+
+      $form["islandora-ingest-form-step-context"] = array(
+        '#title' => t("Applicable Content Models"),
+        '#theme' => 'item_list',
+        '#items' => $items,
         '#weight' => -1000,
       );
     }
