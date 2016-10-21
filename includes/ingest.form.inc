@@ -486,7 +486,7 @@ function islandora_ingest_form_stepify(array $form, array &$form_state, array $s
 }
 
 /**
- * Append CModel label to the top of the step's form.
+ * Append CModel label(s) to the top of the step's form.
  *
  * @param array $form
  *   The Drupal form.
@@ -500,7 +500,7 @@ function islandora_ingest_form_add_step_context(array &$form, array $form_state)
       $items = array();
       if (is_array($form_state['islandora']['shared_storage']['collection'])) {
         // Form state config allows for multiple collection objects.
-        foreach ($form_state['islandora']['shared_storage']['collection'] as &$collection) {
+        foreach ($form_state['islandora']['shared_storage']['collection'] as $collection) {
           $policy = new CollectionPolicy($collection['COLLECTION_POLICY']->content);
           $policy_content_models = $policy->getContentModels();
           $label = isset($policy_content_models[$value]) ? $policy_content_models[$value]['name'] : $fedora_cmodel->label;
