@@ -535,11 +535,11 @@ function islandora_ingest_form_add_step_context(array &$form, array $form_state)
 
     default:
       $form["islandora-ingest-form-step-context"] = array(
-          '#title' => t("Applicable Content Models"),
-          '#theme' => 'item_list',
-          '#items' => array_values($items),
-          '#weight' => -1000,
-        );
+        '#title' => t("Applicable Content Models"),
+        '#theme' => 'item_list',
+        '#items' => array_values($items),
+        '#weight' => -1000,
+      );
       break;
   }
 }
