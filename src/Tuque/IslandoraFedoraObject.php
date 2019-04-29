@@ -54,7 +54,7 @@ class IslandoraFedoraObject extends FedoraObject implements RefinableCacheableDe
    * @return string
    *   The cache tag for the given PID.
    */
-  protected static function getDrupalCacheObjectTag($id) {
+  public static function getDrupalCacheObjectTag($id) {
     return "islandora_object:{$id}";
   }
 

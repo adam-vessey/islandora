@@ -37,9 +37,27 @@ class IslandoraFedoraDatastream extends FedoraDatastream implements RefinableCac
    *   The cache tag for this object.
    */
   public function drupalCacheTag() {
-    return implode(':', [
+    return static::getDrupalCacheDatastreamTag(
       $this->parent->drupalCacheTag(),
-      $this->id,
+      $this->id
+    );
+  }
+
+  /**
+   * Helper; generate a datastream tag, given an object and DSID.
+   *
+   * @param IslandoraFedoraObject $object
+   *   The object containing the datastream.
+   * @param string $id
+   *   The datastream ID for which to generate a cache tag.
+   *
+   * @return string
+   *   The cache tag for the given PID.
+   */
+  public static function getDrupalCacheDatastreamTag(IslandoraFedoraObject $object, $id) {
+    return implode(':', [
+      $object->drupalCacheTag(),
+      $id,
     ]);
   }
 
