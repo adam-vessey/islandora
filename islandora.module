@@ -11,6 +11,8 @@ use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\islandora\Controller\DefaultController;
+use Drupal\islandora\Tuque\IslandoraFedoraObject;
+use Drupal\islandora\Tuque\IslandoraFedoraDatastream;
 
 // @codingStandardsIgnoreStart
 // Common datastreams.
