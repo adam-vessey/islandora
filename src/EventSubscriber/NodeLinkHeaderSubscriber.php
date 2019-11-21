@@ -15,6 +15,9 @@ use Symfony\Component\HttpKernel\Event\FilterResponseEvent;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Entity\EntityFieldManagerInterface;
+
 /**
  * Class NodeLinkHeaderSubscriber.
  *
@@ -50,8 +53,8 @@ class NodeLinkHeaderSubscriber extends LinkHeaderSubscriber implements EventSubs
    *   Derivative utils.
    */
   public function __construct(
-    EntityTypeManager $entity_type_manager,
-    EntityFieldManager $entity_field_manager,
+    EntityTypeManagerInterface $entity_type_manager,
+    EntityFieldManagerInterface $entity_field_manager,
     AccessManagerInterface $access_manager,
     AccountInterface $account,
     RouteMatchInterface $route_match,

@@ -20,6 +20,9 @@ use Drupal\media\MediaInterface;
 use Drupal\node\NodeInterface;
 use Drupal\taxonomy\TermInterface;
 
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Entity\EntityFieldManagerInterface;
+
 /**
  * Utility functions for figuring out when to fire derivative reactions.
  */
@@ -79,8 +82,8 @@ class IslandoraUtils {
    *   Flysystem factory.
    */
   public function __construct(
-    EntityTypeManager $entity_type_manager,
-    EntityFieldManager $entity_field_manager,
+    EntityTypeManagerInterface $entity_type_manager,
+    EntityFieldManagerInterface $entity_field_manager,
     QueryFactory $entity_query,
     ContextManager $context_manager,
     FlysystemFactory $flysystem_factory

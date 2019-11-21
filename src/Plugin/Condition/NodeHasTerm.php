@@ -9,6 +9,7 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\islandora\IslandoraUtils;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 
 /**
  * Provides a 'Term' condition for nodes.
@@ -59,7 +60,7 @@ class NodeHasTerm extends ConditionPluginBase implements ContainerFactoryPluginI
     $plugin_id,
     $plugin_definition,
     IslandoraUtils $utils,
-    EntityTypeManager $entity_type_manager
+    EntityTypeManagerInterface $entity_type_manager
   ) {
     parent::__construct($configuration, $plugin_id, $plugin_definition);
     $this->utils = $utils;

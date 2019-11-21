@@ -16,6 +16,7 @@ use Drupal\taxonomy\TermInterface;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 
 /**
  * Utility functions for working with source files for Media.
@@ -81,7 +82,7 @@ class MediaSourceService {
    *   Utility service.
    */
   public function __construct(
-    EntityTypeManager $entity_type_manager,
+    EntityTypeManagerInterface $entity_type_manager,
     AccountInterface $account,
     LanguageManagerInterface $language_manager,
     QueryFactory $entity_query,
