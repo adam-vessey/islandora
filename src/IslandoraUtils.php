@@ -563,15 +563,17 @@ class IslandoraUtils {
    *
    * @return string
    *   The entity URL.
+   *
+   * @throws \Drupal\Core\Entity\Exception\UndefinedLinkTemplateException
+   *   Should the given entity not specify a "canonical" template.
    */
   public function getEntityUrl(EntityInterface $entity) {
     $undefined = $this->languageManager->getLanguage('und');
-    $entity_type = $entity->getEntityTypeId();
-    return Url::fromRoute(
-      "entity.$entity_type.canonical",
-      [$entity_type => $entity->id()],
-      ['absolute' => TRUE, 'language' => $undefined]
-    )->toString();
+    return $entity->toUrl('canonical', [
+        'absolute' => TRUE,
+        'language' => $undefined,
+      ])
+      ->toString();
   }
 
   /**

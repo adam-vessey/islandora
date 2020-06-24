@@ -9,6 +9,7 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\islandora\IslandoraUtils;
+use Drupal\Core\Entity\Exception\UndefinedLinkTemplateException;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
@@ -205,7 +206,14 @@ abstract class LinkHeaderSubscriber implements EventSubscriberInterface {
         // Headers are subject to an access check.
         if ($referencedEntity->access('view')) {
 
-          $entity_url = $this->utils->getEntityUrl($referencedEntity);
+          try {
+            $entity_url = $this->utils->getEntityUrl($referencedEntity);
+          }
+          catcH (UndefinedLinkTemplateException $e) {
+            // Not all referencable entities can generate canonical URLs, for
+            // example: block entities.
+            continue;
+          }
 
           // Taxonomy terms are written out as
           // <url>; rel="tag"; title="Tag Name"
