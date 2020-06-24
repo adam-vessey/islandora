@@ -209,7 +209,7 @@ abstract class LinkHeaderSubscriber implements EventSubscriberInterface {
           try {
             $entity_url = $this->utils->getEntityUrl($referencedEntity);
           }
-          catcH (UndefinedLinkTemplateException $e) {
+          catch (UndefinedLinkTemplateException $e) {
             // Not all referencable entities can generate canonical URLs, for
             // example: block entities.
             continue;
