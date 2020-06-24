@@ -565,7 +565,7 @@ class IslandoraUtils {
    *   The entity URL.
    *
    * @throws \Drupal\Core\Entity\Exception\UndefinedLinkTemplateException
-   *   Should the given entity not specify a "canonical" template.
+   *   Thrown if the given entity does not specify a "canonical" template.
    * @throws \Drupal\Core\Entity\EntityMalformedException
    */
   public function getEntityUrl(EntityInterface $entity) {
