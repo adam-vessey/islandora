@@ -2233,3 +2233,29 @@ function islandora_islandora_solution_pack_child_relationships($cmodels) {
   // exist when the hook is called, even if no module responds.
   return array('predicate' => array(), 'prefix' => array());
 }
+
+/**
+ * Implements hook_autoload_info().
+ *
+ * Backdrop compatibility.
+ */
+function islandora_autoload_info() {
+  return array(
+    'DublinCore' => 'includes/dublin_core.inc',
+    'MimeDetect' => 'includes/mime_detect.inc',
+    'IslandoraTuque' => 'includes/tuque.inc',
+    'IslandoraFedoraRepository' => 'includes/tuque_wrapper.inc',
+    'IslandoraRepositoryQuery' => 'includes/tuque_wrapper.inc',
+    'IslandoraNewFedoraObject' => 'includes/tuque_wrapper.inc',
+    'IslandoraFedoraObject' => 'includes/tuque_wrapper.inc',
+    'IslandoraRepositoryConnection' => 'includes/tuque_wrapper.inc',
+    'IslandoraFedoraApi' => 'includes/tuque_wrapper.inc',
+    'IslandoraFedoraApiM' => 'includes/tuque_wrapper.inc',
+    'IslandoraSimpleCache' => 'includes/tuque_wrapper.inc',
+    'IslandoraNewFedoraDatastream' => 'includes/tuque_wrapper.inc',
+    'IslandoraFedoraDatastream' => 'includes/tuque_wrapper.inc',
+    'IslandoraFedoraDatastreamVersion' => 'includes/tuque_wrapper.inc',
+    'IslandoraFedoraRelsExt' => 'includes/tuque_wrapper.inc',
+    'IslandoraFedoraRelsInt' => 'includes/tuque_wrapper.inc',
+  );
+}
