@@ -12,4 +12,4 @@ views.style.iiif_manifest:
     iiif_tile_field:
       type: sequence
       sequence:
-        - type: string
+        type: string
