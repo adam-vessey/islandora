@@ -29,7 +29,3 @@ action.configuration.generate_image_derivative:
     path:
       type: text
       label: 'File path with extension'
-
-field.formatter.settings.islandora_image:
-  type: field.formatter.settings.image
-  label: 'Islandora image field display format settings'

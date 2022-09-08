@@ -166,6 +166,10 @@ condition.plugin.node_had_namespace:
     pid_field:
       type: ignore
       label: 'PID field'
+      
+field.formatter.settings.islandora_image:
+  type: field.formatter.settings.image
+  label: 'Islandora image field display format settings'
 
 condition.plugin.islandora_entity_bundle:
   type: condition.plugin
