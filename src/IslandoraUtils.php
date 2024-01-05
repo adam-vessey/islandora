@@ -7,6 +7,7 @@ use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Entity\Query\ConditionInterface;
 use Drupal\Core\Entity\Query\QueryException;
 use Drupal\Core\Entity\Query\QueryInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
@@ -25,93 +26,24 @@ use Drupal\taxonomy\TermInterface;
 /**
  * Utility functions for figuring out when to fire derivative reactions.
  */
-class IslandoraUtils {
-
-  const EXTERNAL_URI_FIELD = 'field_external_uri';
-
-  const MEDIA_OF_FIELD = 'field_media_of';
-
-  const MEDIA_USAGE_FIELD = 'field_media_use';
-  const MEMBER_OF_FIELD = 'field_member_of';
-  const MODEL_FIELD = 'field_model';
-
-  /**
-   * The entity type manager.
-   *
-   * @var \Drupal\Core\Entity\EntityTypeManagerInterface
-   */
-  protected $entityTypeManager;
-
-  /**
-   * The entity field manager.
-   *
-   * @var \Drupal\Core\Entity\EntityFieldManagerInterface
-   */
-  protected $entityFieldManager;
-
-  /**
-   * Context manager.
-   *
-   * @var \Drupal\context\ContextManager
-   */
-  protected $contextManager;
-
-  /**
-   * Flysystem factory.
-   *
-   * @var \Drupal\flysystem\FlysystemFactory
-   */
-  protected $flysystemFactory;
-
-  /**
-   * Language manager.
-   *
-   * @var \Drupal\Core\Language\LanguageManagerInterface
-   */
-  protected $languageManager;
+class IslandoraUtils implements IslandoraUtilsInterface {
 
   /**
    * Constructor.
-   *
-   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
-   *   The entity type manager.
-   * @param \Drupal\Core\Entity\EntityFieldManagerInterface $entity_field_manager
-   *   The entity field manager.
-   * @param \Drupal\context\ContextManager $context_manager
-   *   Context manager.
-   * @param \Drupal\flysystem\FlysystemFactory $flysystem_factory
-   *   Flysystem factory.
-   * @param \Drupal\Core\Language\LanguageManagerInterface $language_manager
-   *   Language manager.
    */
   public function __construct(
-    EntityTypeManagerInterface $entity_type_manager,
-    EntityFieldManagerInterface $entity_field_manager,
-    ContextManager $context_manager,
-    FlysystemFactory $flysystem_factory,
-    LanguageManagerInterface $language_manager
+    protected EntityTypeManagerInterface $entityTypeManager,
+    protected EntityFieldManagerInterface $entityFieldManager,
+    protected ContextManager $contextManager,
+    protected FlysystemFactory $flysystemFactory,
+    protected LanguageManagerInterface $languageManager,
   ) {
-    $this->entityTypeManager = $entity_type_manager;
-    $this->entityFieldManager = $entity_field_manager;
-    $this->contextManager = $context_manager;
-    $this->flysystemFactory = $flysystem_factory;
-    $this->languageManager = $language_manager;
   }
 
   /**
-   * Gets nodes that a media belongs to.
-   *
-   * @param \Drupal\media\MediaInterface $media
-   *   The Media whose node you are searching for.
-   *
-   * @return \Drupal\node\NodeInterface
-   *   Parent node.
-   *
-   * @throws \Drupal\Core\TypedData\Exception\MissingDataException
-   *   Method $field->first() throws if data structure is unset and no item can
-   *   be created.
+   * {@inheritDoc}
    */
-  public function getParentNode(MediaInterface $media) {
+  public function getParentNode(MediaInterface $media) : ?NodeInterface {
     if (!$media->hasField(self::MEDIA_OF_FIELD)) {
       return NULL;
     }
@@ -119,30 +51,16 @@ class IslandoraUtils {
     if ($field->isEmpty()) {
       return NULL;
     }
-    $parent = $field->first()
+    return $field->first()
       ->get('entity')
-      ->getTarget();
-    if (!is_null($parent)) {
-      return $parent->getValue();
-    }
-    return NULL;
+      ->getTarget()
+      ?->getValue();
   }
 
   /**
-   * Gets media that belong to a node.
-   *
-   * @param \Drupal\node\NodeInterface $node
-   *   The parent node.
-   *
-   * @return \Drupal\media\MediaInterface[]
-   *   The children Media.
-   *
-   * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
-   *   Calling getStorage() throws if the entity type doesn't exist.
-   * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
-   *   Calling getStorage() throws if the storage handler couldn't be loaded.
+   * {@inheritDoc}
    */
-  public function getMedia(NodeInterface $node) {
+  public function getMedia(NodeInterface $node) : array {
     if (!$this->entityTypeManager->getStorage('field_storage_config')
       ->load('media.' . self::MEDIA_OF_FIELD)) {
       return [];
@@ -158,22 +76,9 @@ class IslandoraUtils {
   }
 
   /**
-   * Gets media that belong to a node with the specified term.
-   *
-   * @param \Drupal\node\NodeInterface $node
-   *   The parent node.
-   * @param \Drupal\taxonomy\TermInterface $term
-   *   Taxonomy term.
-   *
-   * @return \Drupal\media\MediaInterface
-   *   The child Media.
-   *
-   * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
-   *   Calling getStorage() throws if the entity type doesn't exist.
-   * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
-   *   Calling getStorage() throws if the storage handler couldn't be loaded.
+   * {@inheritDoc}
    */
-  public function getMediaWithTerm(NodeInterface $node, TermInterface $term) {
+  public function getMediaWithTerm(NodeInterface $node, TermInterface $term) : ?MediaInterface {
     $mids = $this->getMediaReferencingNodeAndTerm($node, $term);
     if (empty($mids)) {
       return NULL;
@@ -182,20 +87,9 @@ class IslandoraUtils {
   }
 
   /**
-   * Gets Media that reference a File.
-   *
-   * @param int $fid
-   *   File id.
-   *
-   * @return \Drupal\media\MediaInterface[]
-   *   Array of media.
-   *
-   * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
-   *   Calling getStorage() throws if the entity type doesn't exist.
-   * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
-   *   Calling getStorage() throws if the storage handler couldn't be loaded.
+   * {@inheritDoc}
    */
-  public function getReferencingMedia($fid) {
+  public function getReferencingMedia($fid) : array {
     // Get media fields that reference files.
     $fields = $this->getReferencingFields('media', 'file');
 
@@ -221,20 +115,9 @@ class IslandoraUtils {
   }
 
   /**
-   * Gets the taxonomy term associated with an external uri.
-   *
-   * @param string $uri
-   *   External uri.
-   *
-   * @return \Drupal\taxonomy\TermInterface|null
-   *   Term or NULL if not found.
-   *
-   * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
-   *   Calling getStorage() throws if the entity type doesn't exist.
-   * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
-   *   Calling getStorage() throws if the storage handler couldn't be loaded.
+   * {@inheritDoc}
    */
-  public function getTermForUri($uri) {
+  public function getTermForUri($uri) : ?TermInterface {
     // Get authority link fields to search.
     $field_map = $this->entityFieldManager->getFieldMap();
     $fields = [];
@@ -267,19 +150,9 @@ class IslandoraUtils {
   }
 
   /**
-   * Gets the taxonomy term associated with an external uri.
-   *
-   * @param \Drupal\taxonomy\TermInterface $term
-   *   Taxonomy term.
-   *
-   * @return string|null
-   *   URI or NULL if not found.
-   *
-   * @throws \Drupal\Core\TypedData\Exception\MissingDataException
-   *   Method $field->first() throws if data structure is unset and no item can
-   *   be created.
+   * {@inheritDoc}
    */
-  public function getUriForTerm(TermInterface $term) {
+  public function getUriForTerm(TermInterface $term) : ?string {
     $fields = $this->getUriFieldNamesForTerms();
     foreach ($fields as $field_name) {
       if ($term && $term->hasField($field_name)) {
@@ -294,12 +167,9 @@ class IslandoraUtils {
   }
 
   /**
-   * Gets every field name that might contain an external uri for a term.
-   *
-   * @return string[]
-   *   Field names for fields that a term may have as an external uri.
+   * {@inheritDoc}
    */
-  public function getUriFieldNamesForTerms() {
+  public function getUriFieldNamesForTerms() : array {
     // Get authority link fields to search.
     $field_map = $this->entityFieldManager->getFieldMap();
     $fields = [];
@@ -315,14 +185,9 @@ class IslandoraUtils {
   }
 
   /**
-   * Executes context reactions for a Node.
-   *
-   * @param string $reaction_type
-   *   Reaction type.
-   * @param \Drupal\node\NodeInterface $node
-   *   Node to evaluate contexts and pass to reaction.
+   * {@inheritDoc}
    */
-  public function executeNodeReactions($reaction_type, NodeInterface $node) {
+  public function executeNodeReactions($reaction_type, NodeInterface $node) : void {
     $provider = new NodeContextProvider($node);
     $provided = $provider->getRuntimeContexts([]);
     $this->contextManager->evaluateContexts($provided);
@@ -334,14 +199,9 @@ class IslandoraUtils {
   }
 
   /**
-   * Executes context reactions for a Media.
-   *
-   * @param string $reaction_type
-   *   Reaction type.
-   * @param \Drupal\media\MediaInterface $media
-   *   Media to evaluate contexts and pass to reaction.
+   * {@inheritDoc}
    */
-  public function executeMediaReactions($reaction_type, MediaInterface $media) {
+  public function executeMediaReactions($reaction_type, MediaInterface $media) : void {
     $provider = new MediaContextProvider($media);
     $provided = $provider->getRuntimeContexts([]);
     $this->contextManager->evaluateContexts($provided);
@@ -353,14 +213,9 @@ class IslandoraUtils {
   }
 
   /**
-   * Executes context reactions for a File.
-   *
-   * @param string $reaction_type
-   *   Reaction type.
-   * @param \Drupal\file\FileInterface $file
-   *   File to evaluate contexts and pass to reaction.
+   * {@inheritDoc}
    */
-  public function executeFileReactions($reaction_type, FileInterface $file) {
+  public function executeFileReactions($reaction_type, FileInterface $file) : void {
     $provider = new FileContextProvider($file);
     $provided = $provider->getRuntimeContexts([]);
     $this->contextManager->evaluateContexts($provided);
@@ -372,14 +227,9 @@ class IslandoraUtils {
   }
 
   /**
-   * Executes context reactions for a File.
-   *
-   * @param string $reaction_type
-   *   Reaction type.
-   * @param \Drupal\taxonomy\TermInterface $term
-   *   Term to evaluate contexts and pass to reaction.
+   * {@inheritDoc}
    */
-  public function executeTermReactions($reaction_type, TermInterface $term) {
+  public function executeTermReactions($reaction_type, TermInterface $term) : void {
     $provider = new TermContextProvider($term);
     $provided = $provider->getRuntimeContexts([]);
     $this->contextManager->evaluateContexts($provided);
@@ -391,16 +241,9 @@ class IslandoraUtils {
   }
 
   /**
-   * Executes derivative reactions for a Media and Node.
-   *
-   * @param string $reaction_type
-   *   Reaction type.
-   * @param \Drupal\node\NodeInterface $node
-   *   Node to pass to reaction.
-   * @param \Drupal\media\MediaInterface $media
-   *   Media to evaluate contexts.
+   * {@inheritDoc}
    */
-  public function executeDerivativeReactions($reaction_type, NodeInterface $node, MediaInterface $media) {
+  public function executeDerivativeReactions($reaction_type, NodeInterface $node, MediaInterface $media) : void {
     $provider = new MediaContextProvider($media);
     $provided = $provider->getRuntimeContexts([]);
     $this->contextManager->evaluateContexts($provided);
@@ -412,17 +255,9 @@ class IslandoraUtils {
   }
 
   /**
-   * Evaluates if fields have changed between two instances of a ContentEntity.
-   *
-   * @param \Drupal\Core\Entity\ContentEntityInterface $entity
-   *   The updated entity.
-   * @param \Drupal\Core\Entity\ContentEntityInterface $original
-   *   The original entity.
-   *
-   * @return bool
-   *   TRUE if the fields have changed.
+   * {@inheritDoc}
    */
-  public function haveFieldsChanged(ContentEntityInterface $entity, ContentEntityInterface $original) {
+  public function haveFieldsChanged(ContentEntityInterface $entity, ContentEntityInterface $original) : bool {
 
     $field_definitions = $this->entityFieldManager->getFieldDefinitions($entity->getEntityTypeId(), $entity->bundle());
 
@@ -458,12 +293,9 @@ class IslandoraUtils {
   }
 
   /**
-   * Returns a list of all available filesystem schemes.
-   *
-   * @return String[]
-   *   List of all available filesystem schemes.
+   * {@inheritDoc}
    */
-  public function getFilesystemSchemes() {
+  public function getFilesystemSchemes() : array {
     $schemes = ['public'];
     if (!empty(Settings::get('file_private_path'))) {
       $schemes[] = 'private';
@@ -472,17 +304,9 @@ class IslandoraUtils {
   }
 
   /**
-   * Get array of media ids that have fields that reference $node and $term.
-   *
-   * @param \Drupal\node\NodeInterface $node
-   *   The node to reference.
-   * @param \Drupal\taxonomy\TermInterface $term
-   *   The term to reference.
-   *
-   * @return array|int|null
-   *   Array of media IDs or NULL.
+   * {@inheritDoc}
    */
-  public function getMediaReferencingNodeAndTerm(NodeInterface $node, TermInterface $term) {
+  public function getMediaReferencingNodeAndTerm(NodeInterface $node, TermInterface $term) : ?array {
     $term_fields = $this->getReferencingFields('media', 'taxonomy_term');
     if (count($term_fields) <= 0) {
       \Drupal::logger("No media fields reference a taxonomy term");
@@ -517,17 +341,9 @@ class IslandoraUtils {
   }
 
   /**
-   * Get the fields on an entity of $entity_type that reference a $target_type.
-   *
-   * @param string $entity_type
-   *   Type of entity to search for.
-   * @param string $target_type
-   *   Type of entity the field references.
-   *
-   * @return array
-   *   Array of fields.
+   * {@inheritDoc}
    */
-  public function getReferencingFields($entity_type, $target_type) {
+  public function getReferencingFields($entity_type, $target_type) : array {
     $fields = $this->entityTypeManager->getStorage('field_storage_config')->getQuery()
       ->condition('entity_type', $entity_type)
       ->condition('settings.target_type', $target_type)
@@ -551,7 +367,7 @@ class IslandoraUtils {
    * @return \Drupal\Core\Entity\Query\ConditionInterface
    *   The OR condition to add to your query.
    */
-  private function getEntityQueryOrCondition(QueryInterface $query, array $fields, $value) {
+  private function getEntityQueryOrCondition(QueryInterface $query, array $fields, $value) : ConditionInterface {
     $condition = $query->orConditionGroup();
     foreach ($fields as $field) {
       $condition->condition($field, $value);
@@ -560,19 +376,9 @@ class IslandoraUtils {
   }
 
   /**
-   * Gets the id URL of an entity.
-   *
-   * @param \Drupal\Core\Entity\EntityInterface $entity
-   *   The entity whose URL you want.
-   *
-   * @return string
-   *   The entity URL.
-   *
-   * @throws \Drupal\Core\Entity\Exception\UndefinedLinkTemplateException
-   *   Thrown if the given entity does not specify a "canonical" template.
-   * @throws \Drupal\Core\Entity\EntityMalformedException
+   * {@inheritDoc}
    */
-  public function getEntityUrl(EntityInterface $entity) {
+  public function getEntityUrl(EntityInterface $entity) : string {
     $undefined = $this->languageManager->getLanguage('und');
     return $entity->toUrl('canonical', [
       'absolute' => TRUE,
@@ -581,30 +387,16 @@ class IslandoraUtils {
   }
 
   /**
-   * Gets the downloadable URL for a file.
-   *
-   * @param \Drupal\file\FileInterface $file
-   *   The file whose URL you want.
-   *
-   * @return string
-   *   The file URL.
+   * {@inheritDoc}
    */
-  public function getDownloadUrl(FileInterface $file) {
+  public function getDownloadUrl(FileInterface $file) : string {
     return $file->createFileUrl(FALSE);
   }
 
   /**
-   * Gets the URL for an entity's REST endpoint.
-   *
-   * @param \Drupal\Core\Entity\EntityInterface $entity
-   *   The entity whose REST endpoint you want.
-   * @param string $format
-   *   REST serialization format.
-   *
-   * @return string
-   *   The REST URL.
+   * {@inheritDoc}
    */
-  public function getRestUrl(EntityInterface $entity, $format = '') {
+  public function getRestUrl(EntityInterface $entity, $format = '') : string {
     $undefined = $this->languageManager->getLanguage('und');
     $entity_type = $entity->getEntityTypeId();
     $rest_url = Url::fromRoute(
@@ -619,46 +411,24 @@ class IslandoraUtils {
   }
 
   /**
-   * Determines if an entity type and bundle make an 'Islandora' type entity.
-   *
-   * @param string $entity_type
-   *   The entity type ('node', 'media', etc...).
-   * @param string $bundle
-   *   Entity bundle ('article', 'page', etc...).
-   *
-   * @return bool
-   *   TRUE if the bundle has the correct fields to be an 'Islandora' type.
+   * {@inheritDoc}
    */
-  public function isIslandoraType($entity_type, $bundle) {
+  public function isIslandoraType($entity_type, $bundle) : bool {
     $fields = $this->entityFieldManager->getFieldDefinitions($entity_type, $bundle);
-    switch ($entity_type) {
-      case 'media':
-        return isset($fields[self::MEDIA_OF_FIELD]) && isset($fields[self::MEDIA_USAGE_FIELD]);
-
-      case 'taxonomy_term':
-        return isset($fields[self::EXTERNAL_URI_FIELD]);
-
-      default:
-        return isset($fields[self::MEMBER_OF_FIELD]);
-    }
+    return match ($entity_type) {
+      'media' => isset($fields[self::MEDIA_OF_FIELD]) && isset($fields[self::MEDIA_USAGE_FIELD]),
+      'taxonomy_term' => isset($fields[self::EXTERNAL_URI_FIELD]),
+      default => isset($fields[self::MEMBER_OF_FIELD]),
+    };
   }
 
   /**
-   * Util function for access handlers .
-   *
-   * @param string $entity_type
-   *   Entity type such as 'node', 'media', 'taxonomy_term', etc..
-   * @param string $bundle_type
-   *   Bundle type such as 'node_type', 'media_type', 'vocabulary', etc...
-   *
-   * @return bool
-   *   If user can create _at least one_ of the 'Islandora' types requested.
+   * {@inheritDoc}
    */
-  public function canCreateIslandoraEntity($entity_type, $bundle_type) {
+  public function canCreateIslandoraEntity($entity_type, $bundle_type) : bool {
     $bundles = $this->entityTypeManager->getStorage($bundle_type)->loadMultiple();
     $access_control_handler = $this->entityTypeManager->getAccessControlHandler($entity_type);
 
-    $allowed = [];
     foreach (array_keys($bundles) as $bundle) {
       // Skip bundles that aren't 'Islandora' types.
       if (!$this->isIslandoraType($entity_type, $bundle)) {
@@ -677,18 +447,7 @@ class IslandoraUtils {
   }
 
   /**
-   * Recursively finds ancestors of an entity.
-   *
-   * @param \Drupal\Core\Entity\ContentEntityInterface $entity
-   *   The entity being checked.
-   * @param array $fields
-   *   An optional array where the values are the field names to be used for
-   *   retrieval.
-   * @param int|bool $max_height
-   *   How many levels of checking should be done when retrieving ancestors.
-   *
-   * @return array
-   *   An array where the keys and values are the node IDs of the ancestors.
+   * {@inheritDoc}
    */
   public function findAncestors(ContentEntityInterface $entity, array $fields = [self::MEMBER_OF_FIELD], $max_height = FALSE): array {
     // XXX: If a negative integer is passed assume it's false.
@@ -718,7 +477,7 @@ class IslandoraUtils {
    * @param int $current_height
    *   The current height of the recursion.
    */
-  protected function findAncestorsByEntityReference(ContentEntityInterface $entity, array &$context, array $fields = [self::MEMBER_OF_FIELD], int $current_height = 1): void {
+  protected function findAncestorsByEntityReference(ContentEntityInterface $entity, array &$context, array $fields = [self::MEMBER_OF_FIELD], int $current_height = 1) : void {
     $parents = $this->getParentsByEntityReference($entity, $fields);
     foreach ($parents as $parent) {
       if (isset($context['ancestors'][$parent->id()])) {
@@ -742,7 +501,7 @@ class IslandoraUtils {
    * @return array
    *   An array of entity objects keyed by field item deltas.
    */
-  protected function getParentsByEntityReference(ContentEntityInterface $entity, array $fields): array {
+  protected function getParentsByEntityReference(ContentEntityInterface $entity, array $fields) : array {
     $parents = [];
     foreach ($fields as $field) {
       if ($entity->hasField($field)) {
