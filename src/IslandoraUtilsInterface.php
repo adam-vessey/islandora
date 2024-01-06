@@ -85,7 +85,7 @@ interface IslandoraUtilsInterface {
    * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
    *   Calling getStorage() throws if the storage handler couldn't be loaded.
    */
-  public function getReferencingMedia($fid) : array;
+  public function getReferencingMedia(int $fid) : array;
 
   /**
    * Gets the taxonomy term associated with an external uri.
@@ -101,7 +101,7 @@ interface IslandoraUtilsInterface {
    * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
    *   Calling getStorage() throws if the storage handler couldn't be loaded.
    */
-  public function getTermForUri($uri) : ?TermInterface;
+  public function getTermForUri(string $uri) : ?TermInterface;
 
   /**
    * Gets the taxonomy term associated with an external uri.

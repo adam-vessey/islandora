@@ -89,7 +89,7 @@ class IslandoraUtils implements IslandoraUtilsInterface {
   /**
    * {@inheritDoc}
    */
-  public function getReferencingMedia($fid) : array {
+  public function getReferencingMedia(int $fid) : array {
     // Get media fields that reference files.
     $fields = $this->getReferencingFields('media', 'file');
 
@@ -117,7 +117,7 @@ class IslandoraUtils implements IslandoraUtilsInterface {
   /**
    * {@inheritDoc}
    */
-  public function getTermForUri($uri) : ?TermInterface {
+  public function getTermForUri(string $uri) : ?TermInterface {
     // Get authority link fields to search.
     $field_map = $this->entityFieldManager->getFieldMap();
     $fields = [];
