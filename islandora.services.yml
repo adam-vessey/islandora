@@ -55,6 +55,15 @@ services:
   islandora.utils:
     class: Drupal\islandora\IslandoraUtils
     arguments: ['@entity_type.manager', '@entity_field.manager', '@context.manager', '@flysystem_factory', '@language_manager']
+  islandora.utils.cached:
+    class: Drupal\islandora\CacheableIslandoraUtils
+    decorates: islandora.utils
+    arguments: ['@.inner', '@cache.islandora.utils', '@cache_contexts_manager']
+  cache.islandora.utils:
+    class: Drupal\Core\Cache\DatabaseBackend
+    tags: [{name: cache.bin}]
+    factory: ['@cache_factory', 'get']
+    arguments: ['islandora.utils']
   islandora.entity_mapper:
     class: Islandora\EntityMapper\EntityMapper
   islandora.stomp.auth_header_listener:

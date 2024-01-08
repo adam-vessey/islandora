@@ -15,7 +15,7 @@ use Drupal\node\NodeInterface;
 use Drupal\taxonomy\TermInterface;
 
 /**
- *
+ * Caching proxy for IslandoraUtils service.
  */
 class CacheableIslandoraUtils implements IslandoraUtilsInterface {
 
@@ -28,10 +28,21 @@ class CacheableIslandoraUtils implements IslandoraUtilsInterface {
     protected CacheContextsManager $cacheContextsManager,
   ) {}
 
+  /**
+   * Return results for the given function call, caching along the way.
+   *
+   * @param string $func
+   *   The function/method to call.
+   * @param array $args
+   *   The array of arguments to pass to the function/method call.
+   *
+   * @return mixed
+   *   The results of the call.
+   */
   protected function cachedCall(string $func, array $args) : mixed {
     /** @var string $cache_id */
     /** @var \Drupal\Core\Cache\CacheableMetadata $cache_meta */
-    [$cache_id, $cache_meta] = $this->mapCacheId($func, ...$args);
+    [$cache_id, $cache_meta] = $this->mapCacheId($func, $args);
 
     if ($data = $this->cache->get($cache_id)) {
       return $data->data;
@@ -45,7 +56,9 @@ class CacheableIslandoraUtils implements IslandoraUtilsInterface {
   /**
    * Helper; build out a cache ID.
    *
-   * @param ...$parts
+   * @param string $func
+   *   The name of the function for which to build a cache ID.
+   * @param array $parts
    *   Items with which to build out the cache ID.
    *
    * @return array
@@ -53,7 +66,7 @@ class CacheableIslandoraUtils implements IslandoraUtilsInterface {
    *   - the cache ID; and,
    *   - a CacheableMetadata instance.
    */
-  protected function mapCacheId(...$parts) : array {
+  protected function mapCacheId(string $func, array $parts) : array {
     $cache_meta = new CacheableMetadata();
     $cache_meta->addCacheContexts(['user']);
 
@@ -72,6 +85,9 @@ class CacheableIslandoraUtils implements IslandoraUtilsInterface {
 
     return [
       implode(':', array_merge(
+        [
+          Html::getClass($func),
+        ],
         $this->cacheContextsManager->convertTokensToKeys($cache_meta->getCacheContexts())->getKeys(),
         array_map(Html::getClass(...), $prepped),
       )),
