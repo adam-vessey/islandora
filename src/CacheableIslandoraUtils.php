@@ -16,8 +16,10 @@ use Drupal\taxonomy\TermInterface;
 
 /**
  * Caching proxy for IslandoraUtils service.
+ *
+ * XXX: Ideally, the subclassing of `IslandoraUtils` should go away.
  */
-class CacheableIslandoraUtils implements IslandoraUtilsInterface {
+class CacheableIslandoraUtils extends IslandoraUtils implements IslandoraUtilsInterface {
 
   /**
    * Constructor.

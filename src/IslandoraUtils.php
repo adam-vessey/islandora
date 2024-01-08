@@ -343,7 +343,7 @@ class IslandoraUtils implements IslandoraUtilsInterface {
   /**
    * {@inheritDoc}
    */
-  public function getReferencingFields($entity_type, $target_type) : array {
+  public function getReferencingFields(string $entity_type, string $target_type) : array {
     $fields = $this->entityTypeManager->getStorage('field_storage_config')->getQuery()
       ->condition('entity_type', $entity_type)
       ->condition('settings.target_type', $target_type)
@@ -413,7 +413,7 @@ class IslandoraUtils implements IslandoraUtilsInterface {
   /**
    * {@inheritDoc}
    */
-  public function isIslandoraType($entity_type, $bundle) : bool {
+  public function isIslandoraType(string $entity_type, string $bundle) : bool {
     $fields = $this->entityFieldManager->getFieldDefinitions($entity_type, $bundle);
     return match ($entity_type) {
       'media' => isset($fields[self::MEDIA_OF_FIELD]) && isset($fields[self::MEDIA_USAGE_FIELD]),
@@ -425,7 +425,7 @@ class IslandoraUtils implements IslandoraUtilsInterface {
   /**
    * {@inheritDoc}
    */
-  public function canCreateIslandoraEntity($entity_type, $bundle_type) : bool {
+  public function canCreateIslandoraEntity(string $entity_type, string $bundle_type) : bool {
     $bundles = $this->entityTypeManager->getStorage($bundle_type)->loadMultiple();
     $access_control_handler = $this->entityTypeManager->getAccessControlHandler($entity_type);
 
@@ -449,7 +449,7 @@ class IslandoraUtils implements IslandoraUtilsInterface {
   /**
    * {@inheritDoc}
    */
-  public function findAncestors(ContentEntityInterface $entity, array $fields = [self::MEMBER_OF_FIELD], $max_height = FALSE): array {
+  public function findAncestors(ContentEntityInterface $entity, array $fields = [self::MEMBER_OF_FIELD], int|bool $max_height = FALSE): array {
     // XXX: If a negative integer is passed assume it's false.
     if ($max_height < 0) {
       $max_height = FALSE;
