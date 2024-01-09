@@ -73,12 +73,17 @@ class CacheableIslandoraUtils extends IslandoraUtils implements IslandoraUtilsIn
     $cache_meta->addCacheContexts(['user']);
 
     $prepped = [];
+
     foreach ($parts as $part) {
       if ($part instanceof CacheableDependencyInterface) {
         $cache_meta->addCacheableDependency($part);
       }
       if ($part instanceof EntityInterface) {
         $prepped[] = $part->id();
+      }
+      elseif (is_array($part)) {
+        // Only relevant with ::findAncestors(), presently.
+        $prepped = array_merge($prepped, $part);
       }
       else {
         $prepped[] = $part;
