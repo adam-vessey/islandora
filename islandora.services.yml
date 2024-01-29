@@ -58,7 +58,7 @@ services:
   islandora.utils.cached:
     class: Drupal\islandora\CacheableIslandoraUtils
     decorates: islandora.utils
-    arguments: ['@.inner', '@cache.islandora.utils', '@cache_contexts_manager']
+    arguments: ['@.inner', '@cache.islandora.utils', '@cache_contexts_manager', '@entity_type.manager']
   cache.islandora.utils:
     class: Drupal\Core\Cache\DatabaseBackend
     tags: [{name: cache.bin}]

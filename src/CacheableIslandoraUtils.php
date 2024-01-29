@@ -9,6 +9,7 @@ use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Cache\Context\CacheContextsManager;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\file\FileInterface;
 use Drupal\media\MediaInterface;
 use Drupal\node\NodeInterface;
@@ -28,6 +29,7 @@ class CacheableIslandoraUtils extends IslandoraUtils implements IslandoraUtilsIn
     protected IslandoraUtilsInterface $wrapped,
     protected CacheBackendInterface $cache,
     protected CacheContextsManager $cacheContextsManager,
+    protected EntityTypeManagerInterface $entityTypeManager,
   ) {}
 
   /**
@@ -37,20 +39,34 @@ class CacheableIslandoraUtils extends IslandoraUtils implements IslandoraUtilsIn
    *   The function/method to call.
    * @param array $args
    *   The array of arguments to pass to the function/method call.
+   * @param array $cache_info
+   *   Info to build out additional cache context/tags to add if we are to
+   *   return a falsy value, as caching these values can still be useful;
+   *   however, their invalidation can be dependent on new entities.
+   *   Presently, expected:
+   *   - type_list: An array of strings representing type names to add in "list"
+   *     info. Context will be added in to generate the IDs; however, list tags
+   *     will only be added for false-y responses.
    *
    * @return mixed
    *   The results of the call.
    */
-  protected function cachedCall(string $func, array $args) : mixed {
+  protected function cachedCall(string $func, array $args, array $cache_info = []) : mixed {
     /** @var string $cache_id */
     /** @var \Drupal\Core\Cache\CacheableMetadata $cache_meta */
-    [$cache_id, $cache_meta] = $this->mapCacheId($func, $args);
+    [$cache_id, $cache_meta] = $this->mapCacheId($func, $args, $cache_info);
 
     if ($data = $this->cache->get($cache_id)) {
       return $data->data;
     }
 
     $result = $this->wrapped->$func(...$args);
+    if (!$result) {
+      foreach ($cache_info['type_list'] ?? [] as $type_name) {
+        $type = $this->entityTypeManager->getDefinition($type_name);
+        $cache_meta->addCacheTags($type->getListCacheTags());
+      }
+    }
     $this->cache->set($cache_id, $result, CacheBackendInterface::CACHE_PERMANENT, $cache_meta->getCacheTags());
     return $result;
   }
@@ -68,9 +84,14 @@ class CacheableIslandoraUtils extends IslandoraUtils implements IslandoraUtilsIn
    *   - the cache ID; and,
    *   - a CacheableMetadata instance.
    */
-  protected function mapCacheId(string $func, array $parts) : array {
+  protected function mapCacheId(string $func, array $parts, array $cache_info = []) : array {
     $cache_meta = new CacheableMetadata();
     $cache_meta->addCacheContexts(['user']);
+
+    foreach ($cache_info['type_list'] ?? [] as $type_name) {
+      $type = $this->entityTypeManager->getDefinition($type_name);
+      $cache_meta->addCacheContexts($type->getListCacheContexts());
+    }
 
     $prepped = [];
 
@@ -106,49 +127,101 @@ class CacheableIslandoraUtils extends IslandoraUtils implements IslandoraUtilsIn
    * {@inheritDoc}
    */
   public function getParentNode(MediaInterface $media) : ?NodeInterface {
-    return $this->cachedCall(__FUNCTION__, func_get_args());
+    return $this->cachedCall(__FUNCTION__, func_get_args(), [
+      'type_list' => [
+        // In some flows (migrations?), it's hypothetically possible for a media
+        // to be created before the node it is supposed to reference.
+        'node',
+        // Fields not being configured on the given type could lead to
+        // NULLs.
+        'field_config',
+      ],
+    ]);
   }
 
   /**
    * {@inheritDoc}
    */
   public function getMedia(NodeInterface $node) : array {
-    return $this->cachedCall(__FUNCTION__, func_get_args());
+    return $this->cachedCall(__FUNCTION__, func_get_args(), [
+      'type_list' => [
+        // Have to clear if/when new media are added, as they could be relevant.
+        'media',
+        // Fields not being configured on the given type could lead to
+        // NULLs.
+        'field_config',
+      ],
+    ]);
   }
 
   /**
    * {@inheritDoc}
    */
   public function getMediaWithTerm(NodeInterface $node, TermInterface $term) : ?MediaInterface {
-    return $this->cachedCall(__FUNCTION__, func_get_args());
+    return $this->cachedCall(__FUNCTION__, func_get_args(), [
+      'type_list' => [
+        // Have to clear if/when new media are added, as they could be relevant.
+        'media',
+        // Fields not being configured on the given type could lead to
+        // NULLs.
+        'field_config',
+      ],
+    ]);
   }
 
   /**
    * {@inheritDoc}
    */
   public function getReferencingMedia(int $fid) : array {
-    return $this->cachedCall(__FUNCTION__, func_get_args());
+    return $this->cachedCall(__FUNCTION__, func_get_args(), [
+      'type_list' => [
+        // Have to clear if/when new media are added, as they could be relevant.
+        'media',
+        // Fields not being configured on the given type could lead to
+        // NULLs.
+        'field_config',
+      ],
+    ]);
   }
 
   /**
    * {@inheritDoc}
    */
   public function getTermForUri(string $uri) : ?TermInterface {
-    return $this->cachedCall(__FUNCTION__, func_get_args());
+    return $this->cachedCall(__FUNCTION__, func_get_args(), [
+      'type_list' => [
+        // Have to clear if/when new terms are added, as they could be relevant.
+        'taxonomy_term',
+        // Fields not being configured on the given type could lead to
+        // NULLs.
+        'field_config',
+      ],
+    ]);
   }
 
   /**
    * {@inheritDoc}
    */
   public function getUriForTerm(TermInterface $term) : ?string {
-    return $this->cachedCall(__FUNCTION__, func_get_args());
+    return $this->cachedCall(__FUNCTION__, func_get_args(), [
+      'type_list' => [
+        // Fields not being configured on the given type could lead to
+        // NULLs.
+        'field_config',
+      ],
+    ]);
   }
 
   /**
    * {@inheritDoc}
    */
   public function getUriFieldNamesForTerms() : array {
-    return $this->cachedCall(__FUNCTION__, func_get_args());
+    return $this->cachedCall(__FUNCTION__, func_get_args(), [
+      'type_list' => [
+        // Is exactly what is being interrogated.
+        'field_config',
+      ],
+    ]);
   }
 
   /**
@@ -204,14 +277,27 @@ class CacheableIslandoraUtils extends IslandoraUtils implements IslandoraUtilsIn
    * {@inheritDoc}
    */
   public function getMediaReferencingNodeAndTerm(NodeInterface $node, TermInterface $term) : ?array {
-    return $this->cachedCall(__FUNCTION__, func_get_args());
+    return $this->cachedCall(__FUNCTION__, func_get_args(), [
+      'type_list' => [
+        // Have to clear if/when new media are added, as they could be relevant.
+        'media',
+        // Fields not being configured on the given type could lead to
+        // NULLs.
+        'field_config',
+      ],
+    ]);
   }
 
   /**
    * {@inheritDoc}
    */
   public function getReferencingFields(string $entity_type, string $target_type) : array {
-    return $this->cachedCall(__FUNCTION__, func_get_args());
+    return $this->cachedCall(__FUNCTION__, func_get_args(), [
+      'type_list' => [
+        // Is exactly what is being interrogated.
+        'field_config',
+      ],
+    ]);
   }
 
   /**
@@ -239,21 +325,40 @@ class CacheableIslandoraUtils extends IslandoraUtils implements IslandoraUtilsIn
    * {@inheritDoc}
    */
   public function isIslandoraType(string $entity_type, string $bundle) : bool {
-    return $this->cachedCall(__FUNCTION__, func_get_args());
+    return $this->cachedCall(__FUNCTION__, func_get_args(), [
+      'type_list' => [
+        // Is exactly what is being interrogated.
+        'field_config',
+      ],
+    ]);
   }
 
   /**
    * {@inheritDoc}
    */
   public function canCreateIslandoraEntity(string $entity_type, string $bundle_type) : bool {
-    return $this->cachedCall(__FUNCTION__, func_get_args());
+    return $this->cachedCall(__FUNCTION__, func_get_args(), [
+      'type_list' => [
+        // Is exactly what is being interrogated.
+        'field_config',
+      ],
+    ]);
   }
 
   /**
    * {@inheritDoc}
    */
   public function findAncestors(ContentEntityInterface $entity, array $fields = [self::MEMBER_OF_FIELD], bool|int $max_height = FALSE) : array {
-    return $this->cachedCall(__FUNCTION__, func_get_args());
+    // XXX: Could be refactored to have each _level_ do a cache lookup, to
+    // potentially make use of the ancestors of the parent.
+    return $this->cachedCall(__FUNCTION__, func_get_args(), [
+      'type_list' => [
+        // They might change.
+        'node',
+        // Fields being configured could influence.
+        'field_config',
+      ],
+    ]);
   }
 
 }
