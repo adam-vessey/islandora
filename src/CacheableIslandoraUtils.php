@@ -67,6 +67,7 @@ class CacheableIslandoraUtils extends IslandoraUtils implements IslandoraUtilsIn
         $cache_meta->addCacheTags($type->getListCacheTags());
       }
     }
+
     $this->cache->set($cache_id, $result, CacheBackendInterface::CACHE_PERMANENT, $cache_meta->getCacheTags());
     return $result;
   }
@@ -100,7 +101,7 @@ class CacheableIslandoraUtils extends IslandoraUtils implements IslandoraUtilsIn
         $cache_meta->addCacheableDependency($part);
       }
       if ($part instanceof EntityInterface) {
-        $prepped[] = $part->id();
+        $prepped[] = "{$part->getEntityTypeId()}--{$part->id()}";
       }
       elseif (is_array($part)) {
         // Only relevant with ::findAncestors(), presently.
