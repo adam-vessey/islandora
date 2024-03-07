@@ -11,6 +11,7 @@ use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\Url;
+use Drupal\islandora\IslandoraUtils;
 use Drupal\views\Plugin\views\style\StylePluginBase;
 use Drupal\views\ResultRow;
 use GuzzleHttp\Client;
@@ -34,6 +35,13 @@ use Symfony\Component\HttpFoundation\Request;
  * )
  */
 class IIIFManifest extends StylePluginBase {
+
+  /**
+   * Islandora utility functions.
+   *
+   * @var \Drupal\islandora\IslandoraUtils
+   */
+  protected $utils;
 
   /**
    * {@inheritdoc}
@@ -111,7 +119,7 @@ class IIIFManifest extends StylePluginBase {
   /**
    * {@inheritdoc}
    */
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, SerializerInterface $serializer, Request $request, ImmutableConfig $iiif_config, EntityTypeManagerInterface $entity_type_manager, FileSystemInterface $file_system, Client $http_client, MessengerInterface $messenger, ModuleHandlerInterface $moduleHandler) {
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, SerializerInterface $serializer, Request $request, ImmutableConfig $iiif_config, EntityTypeManagerInterface $entity_type_manager, FileSystemInterface $file_system, Client $http_client, MessengerInterface $messenger, ModuleHandlerInterface $moduleHandler, IslandoraUtils $utils) {
     parent::__construct($configuration, $plugin_id, $plugin_definition);
 
     $this->serializer = $serializer;
@@ -121,6 +129,7 @@ class IIIFManifest extends StylePluginBase {
     $this->fileSystem = $file_system;
     $this->httpClient = $http_client;
     $this->messenger = $messenger;
+    $this->utils = $utils;
     $this->moduleHandler = $moduleHandler;
   }
 
@@ -139,7 +148,8 @@ class IIIFManifest extends StylePluginBase {
       $container->get('file_system'),
       $container->get('http_client'),
       $container->get('messenger'),
-      $container->get('module_handler')
+      $container->get('module_handler'),
+      $container->get('islandora.utils')
     );
   }
 
@@ -188,6 +198,11 @@ class IIIFManifest extends StylePluginBase {
           $label = $this->t("IIIF Manifest");
       }
 
+      /**
+       * @var \Drupal\taxonomy\TermInterface|null
+      */
+      $structured_text_term = $this->utils->getTermForUri($this->options['structured_text_term_uri']);
+
       // @see https://iiif.io/api/presentation/2.1/#manifest
       $json += [
         '@type' => 'sc:Manifest',
@@ -207,7 +222,7 @@ class IIIFManifest extends StylePluginBase {
       // For each row in the View result.
       foreach ($this->view->result as $row) {
         // Add the IIIF URL to the image to print out as JSON.
-        $canvases = $this->getTileSourceFromRow($row, $iiif_address, $iiif_base_id);
+        $canvases = $this->getTileSourceFromRow($row, $iiif_address, $iiif_base_id, $structured_text_term);
         foreach ($canvases as $tile_source) {
           $json['sequences'][0]['canvases'][] = $tile_source;
         }
@@ -216,6 +231,9 @@ class IIIFManifest extends StylePluginBase {
     unset($this->view->row_index);
 
     $content_type = 'json';
+
+    // Add a search endpoint if one is defined
+    $this->addSearchEndpoint($json, $url_components);
 
     // Give other modules a chance to alter the manifest.
     $this->moduleHandler->alter('islandora_iiif_manifest', $json, $this);
@@ -237,7 +255,7 @@ class IIIFManifest extends StylePluginBase {
    * @return array
    *   List of IIIF URLs to display in the Openseadragon viewer.
    */
-  protected function getTileSourceFromRow(ResultRow $row, $iiif_address, $iiif_base_id) {
+  protected function getTileSourceFromRow(ResultRow $row, $iiif_address, $iiif_base_id, $structured_text_term) {
     $canvases = [];
     foreach (array_filter(array_values($this->options['iiif_tile_field'])) as $iiif_tile_field) {
       $viewsField = $this->view->field[$iiif_tile_field];
@@ -300,7 +318,7 @@ class IIIFManifest extends StylePluginBase {
             ],
           ];
 
-          if ($ocr_url = $this->getOcrUrl($entity, $row, $i)) {
+          if ($ocr_url = $this->getOcrUrl($entity, $structured_text_term)) {
             $tmp_canvas['seeAlso'] = [
               '@id' => $ocr_url,
               'format' => 'text/vnd.hocr+html',
@@ -389,19 +407,29 @@ class IIIFManifest extends StylePluginBase {
    *   The absolute URL of the current row's structured text,
    *   or FALSE if none.
    */
-  protected function getOcrUrl(EntityInterface $entity, ResultRow $row, $delta) {
+  protected function getOcrUrl(EntityInterface $entity, $structured_text_term) {
     $ocr_url = FALSE;
     $iiif_ocr_file_field = !empty($this->options['iiif_ocr_file_field']) ? array_filter(array_values($this->options['iiif_ocr_file_field'])) : [];
     $ocrField = count($iiif_ocr_file_field) > 0 ? $this->view->field[$iiif_ocr_file_field[0]] : NULL;
     if ($ocrField) {
-      $ocr_entity = $ocrField->getEntity($row);
+      $ocr_entity = $entity;
       $ocr_field_name = $ocrField->definition['field_name'];
       if (!is_null($ocr_field_name)) {
         $ocrs = $ocr_entity->{$ocr_field_name};
-        $ocr = isset($ocrs[$delta]) ? $ocrs[$delta] : FALSE;
-        if ($ocr) {
-          $ocr_url = $ocr->entity->createFileUrl(FALSE);
-        }
+        $ocr = $ocrs[0] ?? FALSE;
+        $ocr_url = $ocr->entity->createFileUrl(FALSE);
+      }
+    }
+    elseif ($structured_text_term) {
+      $parent_node = $this->utils->getParentNode($entity);
+      $ocr_entity_array = $this->utils->getMediaReferencingNodeAndTerm($parent_node, $structured_text_term);
+      $ocr_entity_id = is_array($ocr_entity_array) ? array_shift($ocr_entity_array) : NULL;
+      $ocr_entity = $ocr_entity_id ? $this->entityTypeManager->getStorage('media')->load($ocr_entity_id) : NULL;
+      if ($ocr_entity) {
+        $ocr_file_source = $ocr_entity->getSource();
+        $ocr_fid = $ocr_file_source->getSourceFieldValue($ocr_entity);
+        $ocr_file = $this->entityTypeManager->getStorage('file')->load($ocr_fid);
+        $ocr_url = $ocr_file->createFileUrl(FALSE);
       }
     }
 
@@ -446,6 +474,21 @@ class IIIFManifest extends StylePluginBase {
     $options['iiif_ocr_file_field'] = ['default' => ''];
 
     return $options;
+  }
+
+  protected function addSearchEndpoint(array &$json, array $url_components) {
+    $url_base = $this->getRequest()->getSchemeAndHttpHost();
+    $hocr_search_path = $this->options['search_endpoint'];
+    $hocr_search_url = $url_base . '/' . ltrim($hocr_search_path, '/');
+
+    $hocr_search_url = str_replace('%node', $url_components[1], $hocr_search_url);
+
+    $json['service'][] = [
+          "@context" => "http://iiif.io/api/search/0/context.json",
+          "@id" => $hocr_search_url,
+          "profile" => "http://iiif.io/api/search/0/search",
+          "label" => t("Search inside this work"),
+    ];
   }
 
   /**
@@ -504,8 +547,25 @@ class IIIFManifest extends StylePluginBase {
       '#title' => $this->t('Structured OCR data file field'),
       '#type' => 'checkboxes',
       '#default_value' => $this->options['iiif_ocr_file_field'],
-      '#description' => $this->t('The source of structured OCR text for each entity.'),
+      '#description' => $this->t('The source of structured OCR text for each entity. If the term setting below is left blank, it will be the same entity as the source image'),
       '#options' => $field_options,
+      '#required' => FALSE,
+    ];
+
+    $form['structured_text_term'] = [
+      '#type' => 'entity_autocomplete',
+      '#target_type' => 'taxonomy_term',
+      '#title' => $this->t('Structured OCR text term'),
+      '#default_value' => $this->utils->getTermForUri($this->options['structured_text_term_uri']),
+      '#required' => FALSE,
+      '#description' => $this->t('Term indicating the media that holds structured text, such as hOCR, for the given object. Use this if the text is on a separate media from the tile source.'),
+    ];
+
+    $form['search_endpoint'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t("Search endpoint path."),
+      '#description' => $this->t("If there is a search endpoint to search within the book that returns IIIF annotations, put it here. Use substitutions %node and %keywords.<br>E.g., paged-content-search/%node?search-in-pages=%keywords"),
+      '#default_value' => $this->options['search_endpoint'],
       '#required' => FALSE,
     ];
   }
@@ -518,6 +578,27 @@ class IIIFManifest extends StylePluginBase {
    */
   public function getFormats() {
     return ['json' => 'json'];
+  }
+
+  /**
+   * Submit handler for options form.
+   *
+   * Used to store the structured text media term by URL instead of Ttid.
+   *
+   * @param array $form
+   *   The form.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The form state object.
+   */
+  // @codingStandardsIgnoreStart
+  public function submitOptionsForm(&$form, FormStateInterface $form_state) {
+    // @codingStandardsIgnoreEnd
+    $style_options = $form_state->getValue('style_options');
+    $tid = $style_options['structured_text_term'];
+    $term = $this->entityTypeManager->getStorage('taxonomy_term')->load($tid);
+    $style_options['structured_text_term_uri'] = $this->utils->getUriForTerm($term);
+    $form_state->setValue('style_options', $style_options);
+    parent::submitOptionsForm($form, $form_state);
   }
 
 }
