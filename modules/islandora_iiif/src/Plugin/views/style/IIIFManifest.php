@@ -547,7 +547,7 @@ class IIIFManifest extends StylePluginBase {
       '#title' => $this->t('Structured OCR data file field'),
       '#type' => 'checkboxes',
       '#default_value' => $this->options['iiif_ocr_file_field'],
-      '#description' => $this->t('The source of structured OCR text for each entity. If the term setting below is left blank, it will be the same entity as the source image'),
+      '#description' => $this->t("If the hOCR is a field on the same entity as the image source  field above, select it here. If it's found in a related entity via the term below, leave this blank."),
       '#options' => $field_options,
       '#required' => FALSE,
     ];
@@ -564,7 +564,7 @@ class IIIFManifest extends StylePluginBase {
     $form['search_endpoint'] = [
       '#type' => 'textfield',
       '#title' => $this->t("Search endpoint path."),
-      '#description' => $this->t("If there is a search endpoint to search within the book that returns IIIF annotations, put it here. Use substitutions %node and %keywords.<br>E.g., paged-content-search/%node?search-in-pages=%keywords"),
+      '#description' => $this->t("If there is a search endpoint to search within the book that returns IIIF annotations, put it here. Use %node substitution where needed.<br>E.g., paged-content-search/%node"),
       '#default_value' => $this->options['search_endpoint'],
       '#required' => FALSE,
     ];
