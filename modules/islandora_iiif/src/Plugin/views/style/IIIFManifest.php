@@ -12,6 +12,7 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\Url;
 use Drupal\islandora\IslandoraUtils;
+use Drupal\taxonomy\TermInterface;
 use Drupal\views\Plugin\views\style\StylePluginBase;
 use Drupal\views\ResultRow;
 use GuzzleHttp\Client;
@@ -251,7 +252,7 @@ class IIIFManifest extends StylePluginBase {
    * @param string $iiif_base_id
    *   The URL for the request, minus the last part of the URL,
    *   which is likely "manifest".
-   * @param \Drupal\taxonomy\TermInterface $structured_text_term
+   * @param $structured_text_term
    *   The term representing the media use.
    *
    * @return array
@@ -400,7 +401,7 @@ class IIIFManifest extends StylePluginBase {
    *
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The entity at the current row.
-   * @param \Drupal\taxonomy\TermInterface $structured_text_term
+   * @param $structured_text_term
    *   The term representing the media use.
    *
    * @return string|false
@@ -477,7 +478,7 @@ class IIIFManifest extends StylePluginBase {
   }
 
   /**
-   * Undocumented function
+   * Add the configured search endpoint to the manifest.
    *
    * @param array $json
    *   The IIIF manifest.
