@@ -401,14 +401,14 @@ class IIIFManifest extends StylePluginBase {
    *
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The entity at the current row.
-   * @param $structured_text_term
+   * @param \Drupal\taxonomy\TermInterface $structured_text_term
    *   The term representing the media use.
    *
    * @return string|false
    *   The absolute URL of the current row's structured text,
    *   or FALSE if none.
    */
-  protected function getOcrUrl(EntityInterface $entity, $structured_text_term) {
+  protected function getOcrUrl(EntityInterface $entity, TermInterface $structured_text_term) {
     $ocr_url = FALSE;
     $iiif_ocr_file_field = !empty($this->options['iiif_ocr_file_field']) ? array_filter(array_values($this->options['iiif_ocr_file_field'])) : [];
     $ocrField = count($iiif_ocr_file_field) > 0 ? $this->view->field[$iiif_ocr_file_field[0]] : NULL;
