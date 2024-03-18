@@ -232,7 +232,7 @@ class IIIFManifest extends StylePluginBase {
 
     $content_type = 'json';
 
-    // Add a search endpoint if one is defined
+    // Add a search endpoint if one is defined.
     $this->addSearchEndpoint($json, $url_components);
 
     // Give other modules a chance to alter the manifest.
@@ -251,6 +251,8 @@ class IIIFManifest extends StylePluginBase {
    * @param string $iiif_base_id
    *   The URL for the request, minus the last part of the URL,
    *   which is likely "manifest".
+   * @param \Drupal\taxonomy\TermInterface $structured_text_term
+   *   The term representing the media use.
    *
    * @return array
    *   List of IIIF URLs to display in the Openseadragon viewer.
@@ -398,10 +400,8 @@ class IIIFManifest extends StylePluginBase {
    *
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The entity at the current row.
-   * @param \Drupal\views\ResultRow $row
-   *   Result row.
-   * @param int $delta
-   *   The delta in case there are multiple canvases on one media.
+   * @param \Drupal\taxonomy\TermInterface $structured_text_term
+   *   The term representing the media use.
    *
    * @return string|false
    *   The absolute URL of the current row's structured text,
@@ -476,6 +476,14 @@ class IIIFManifest extends StylePluginBase {
     return $options;
   }
 
+  /**
+   * Undocumented function
+   *
+   * @param array $json
+   *   The IIIF manifest.
+   * @param array $url_components
+   *   The search endpoint URL as array.
+   */
   protected function addSearchEndpoint(array &$json, array $url_components) {
     $url_base = $this->getRequest()->getSchemeAndHttpHost();
     $hocr_search_path = $this->options['search_endpoint'];
@@ -484,10 +492,10 @@ class IIIFManifest extends StylePluginBase {
     $hocr_search_url = str_replace('%node', $url_components[1], $hocr_search_url);
 
     $json['service'][] = [
-          "@context" => "http://iiif.io/api/search/0/context.json",
-          "@id" => $hocr_search_url,
-          "profile" => "http://iiif.io/api/search/0/search",
-          "label" => t("Search inside this work"),
+      "@context" => "http://iiif.io/api/search/0/context.json",
+      "@id" => $hocr_search_url,
+      "profile" => "http://iiif.io/api/search/0/search",
+      "label" => t("Search inside this work"),
     ];
   }
 
