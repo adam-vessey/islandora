@@ -252,7 +252,7 @@ class IIIFManifest extends StylePluginBase {
    * @param string $iiif_base_id
    *   The URL for the request, minus the last part of the URL,
    *   which is likely "manifest".
-   * @param $structured_text_term
+   * @param \Drupal\taxonomy\TermInterface $structured_text_term
    *   The term representing the media use.
    *
    * @return array
