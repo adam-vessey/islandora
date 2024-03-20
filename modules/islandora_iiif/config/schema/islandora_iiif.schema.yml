@@ -25,7 +25,7 @@ views.style.iiif_manifest:
       label: "Structured OCR data file field"
       sequence:
         type: string
-    structured_text_term:
+    structured_text_term_uri:
       type: string
       label: "Structured text term"
     search_endpoint:

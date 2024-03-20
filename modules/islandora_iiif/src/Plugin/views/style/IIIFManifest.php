@@ -570,7 +570,7 @@ class IIIFManifest extends StylePluginBase {
       '#type' => 'entity_autocomplete',
       '#target_type' => 'taxonomy_term',
       '#title' => $this->t('Structured OCR text term'),
-      '#default_value' => $this->utils->getTermForUri($this->options['structured_text_term_uri']),
+      '#default_value' => $this->getStructuredTextTerm(),
       '#required' => FALSE,
       '#description' => $this->t('Term indicating the media that holds structured text, such as hOCR, for the given object. Use this if the text is on a separate media from the tile source.'),
     ];
@@ -609,6 +609,7 @@ class IIIFManifest extends StylePluginBase {
     // @codingStandardsIgnoreEnd
     $style_options = $form_state->getValue('style_options');
     $tid = $style_options['structured_text_term'];
+    unset($style_options['structured_text_term']);
     $term = $this->entityTypeManager->getStorage('taxonomy_term')->load($tid);
     $style_options['structured_text_term_uri'] = $this->utils->getUriForTerm($term);
     $form_state->setValue('style_options', $style_options);
