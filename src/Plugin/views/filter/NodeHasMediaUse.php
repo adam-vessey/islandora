@@ -88,7 +88,11 @@ class NodeHasMediaUse extends FilterPluginBase {
     $sub_query->join('media__field_media_of', 'of', 'm.mid = of.entity_id');
     $sub_query->fields('of', ['field_media_of_target_id'])
       ->condition('use.field_media_use_target_id', $term->id());
-    $this->query->addWhere(0, 'nid', $sub_query, $condition);
+
+    /** @var \Drupal\views\Plugin\views\query\Sql $query */
+    $query = $this->query;
+    $alias = $query->ensureTable('node_field_data', $this->relationship);
+    $query->addWhere(0, "{$alias}.nid", $sub_query, $condition);
   }
 
 }
