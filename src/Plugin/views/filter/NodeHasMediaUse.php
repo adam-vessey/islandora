@@ -84,10 +84,10 @@ class NodeHasMediaUse extends FilterPluginBase {
       return;
     }
     $sub_query = \Drupal::database()->select('media', 'm');
-    $sub_query->join('media__field_media_use', 'use', 'm.mid = use.entity_id');
-    $sub_query->join('media__field_media_of', 'of', 'm.mid = of.entity_id');
-    $sub_query->fields('of', ['field_media_of_target_id'])
-      ->condition('use.field_media_use_target_id', $term->id());
+    $use_alias = $sub_query->join('media__field_media_use', 'use', 'm.mid = %alias.entity_id');
+    $of_alias = $sub_query->join('media__field_media_of', 'of', 'm.mid = %alias.entity_id');
+    $sub_query->fields($of_alias, ['field_media_of_target_id'])
+      ->condition("{$use_alias}.field_media_use_target_id", $term->id());
 
     /** @var \Drupal\views\Plugin\views\query\Sql $query */
     $query = $this->query;
